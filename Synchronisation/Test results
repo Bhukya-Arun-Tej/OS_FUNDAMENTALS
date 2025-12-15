@@ -1,0 +1,5 @@
+For mutex_test.cpp -> time duration is approximately 120000ns
+For mutex_test_2.cpp -> time duration is approximately 600000ns
+For atomic_add.cpp - > time duration is approximately 500000ns
+For atomic_add_2.cpp - > time duration is approximately 100000ns
+
