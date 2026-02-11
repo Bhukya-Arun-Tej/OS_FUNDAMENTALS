@@ -13,10 +13,9 @@ enum Side{
 };
 
 enum OrderType{
-    Limit,
-    Market,
     FillAndKill,
-    GoodTillCancel,
+    Market,
+    Limit,
 };
 
 

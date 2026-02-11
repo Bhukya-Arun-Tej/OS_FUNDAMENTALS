@@ -34,4 +34,8 @@ class spsc{
             head.store((h+1) & (Capacity-1), std::memory_order_relaxed);
             return true;
         }
+        
+        size_t size(){
+            return (tail.load(std::memory_order_relaxed) - head.load(std::memory_order_relaxed)) & (Capacity-1);
+        }
     };

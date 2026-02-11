@@ -32,6 +32,7 @@ void bench_ring() {
     std::cout << "Ring buffer: "
               << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count()
               << " ms\n";
+    std::cout<<"size is "<<q.size()<<std::endl;
 }
 
 void bench_boost() {
