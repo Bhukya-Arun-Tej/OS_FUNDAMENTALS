@@ -4,45 +4,33 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <arpa/inet.h>
 
 
 int main(){
-    addrinfo hints, *res, *ptr;
-    int sockfd, yes=1, no=0;
-    int MAXDATASIZE = 100;
-    std::string port = "3490";
-    
 
-    memset(&hints,0,sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_flags = AI_PASSIVE;
-    hints.ai_socktype = SOCK_STREAM;
+    int sockfd;
+    constexpr int yes=1, no=0;
+    constexpr int MAXDATASIZE = 100;
 
-    if(getaddrinfo(NULL, port.c_str(),&hints,&res)){
-        perror("getaddrinfo");
-        return 2;
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(3490);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    inet_pton(AF_INET,"127.0.0.1",&addr.sin_addr);
+
+
+    sockfd = socket(AF_INET, SOCK_STREAM,0);
+    if(sockfd==-1){
+        perror("Socket create");
+        return 1;
     }
 
-    for(ptr=res;ptr!=NULL; ptr=ptr->ai_next){
-        //create socket
-        sockfd = socket(ptr->ai_family, ptr->ai_socktype,ptr->ai_protocol);
-        if(sockfd==-1){
-            perror("Socket create");
-            continue;
-        }
-
-        if(connect(sockfd,ptr->ai_addr, ptr->ai_addrlen)==-1){
-            perror("Connect");
-            continue;
-        }
-
-        break;
+    if(connect(sockfd,reinterpret_cast<sockaddr*>(&addr), sizeof(addr))==-1){
+        perror("Connect");
+        return 1;
     }
-
-    freeaddrinfo(res);
-
     
-
     std::cout<<"Starting client... \n";
     while(1){
         // sockaddr client;
