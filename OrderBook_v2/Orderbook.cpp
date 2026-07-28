@@ -22,6 +22,7 @@ class Order{
         Side m_side{};
         Price m_price{};
         Quantity m_quantity{};
+        Quantity m_remainingQuantity{};
     public:
         Order
         (
@@ -33,7 +34,22 @@ class Order{
         m_orderId(orderId),
         m_side(side),
         m_price(price),
-        m_quantity(quantity){}
+        m_quantity(quantity),
+        m_remainingQuantity(quantity){}
+
+        Order
+        (
+            OrderId orderId,
+            Side side,
+            Price price,
+            Quantity quantity,
+            Quantity remainingQuantity
+        ): 
+        m_orderId(orderId),
+        m_side(side),
+        m_price(price),
+        m_quantity(quantity),
+        m_remainingQuantity(remainingQuantity){}
 
         Price getPrice() const{
             return m_price;
@@ -41,6 +57,26 @@ class Order{
 
         OrderId getOrderId() const{
             return m_orderId;
+        }
+
+        Quantity getQuantity() const {
+            return m_quantity;
+        }
+
+        Side getSide() const{
+            return m_side;
+        }
+
+        Quantity getRemainingQuantity() const{
+            return m_remainingQuantity;
+        }
+
+        void setQuantity(Quantity newQuantity){
+            m_quantity = newQuantity;
+        }
+
+        void setRemainingQuantity(Quantity newQuantity){
+            m_remainingQuantity=newQuantity;
         }
 };
 using OrderList = std::list<Order>;
@@ -68,8 +104,48 @@ class OrderLocation{
         }
 };
 
+class TradeInfo{
+    private:
+        OrderId m_orderId;
+        Price m_price;
+        Quantity m_quantity;
+    public:
+        TradeInfo() = default;
+        TradeInfo(OrderId orderId, Price price, Quantity quantity):
+        m_orderId{orderId}, m_price{price}, m_quantity{quantity}{}
+
+        OrderId getOrderId() const{
+            return m_orderId;
+        }
+        Price getPrice() const{
+            return m_price;
+        }
+        Quantity getQuantity() const{
+            return m_quantity;
+        }
+};
+
+class Trade{
+    private:
+        TradeInfo m_buyTradeInfo{};
+        TradeInfo m_sellTradeInfo{};
+    public:
+        Trade() = default;
+        Trade(TradeInfo buyTradeInfo, TradeInfo sellTradeInfo):
+        m_buyTradeInfo{buyTradeInfo}, m_sellTradeInfo{sellTradeInfo}{}
+
+        TradeInfo getBuyTradeInfo() const{
+            return m_buyTradeInfo;
+        }
+
+        TradeInfo getSellTradeInfo() const{
+            return m_sellTradeInfo;
+        }
+};
+
 using BuyMap = std::map<Price,OrderList,std::greater<Price>>;
 using SellMap = std::map<Price,OrderList>; 
+using Trades = std::vector<Trade>;
 
 class OrderBook{
     private:
@@ -78,12 +154,67 @@ class OrderBook{
         std::unordered_map<OrderId, OrderLocation> m_orderIndexMap;
 
     public:
-    
-    void m_addOrder(OrderId orderid, Side side, Price price, Quantity quantity){
-        if(m_orderIndexMap.contains(orderid)){
-            return; 
+
+    const BuyMap& getBuyMap() const{
+        return m_buyMap;
+    }
+    const SellMap& getSellMap() const{
+        return m_sellMap;
+    }
+
+    void printBuy(){
+        const auto &map_t = getBuyMap();
+        for(auto it:map_t){
+            std::cout<<it.first<<": ";
+            for(auto itr:it.second){
+                std::cout<<"{"<<itr.getOrderId()<<", "<<itr.getRemainingQuantity()<<"}";
+            }
+            std::cout<<"\n";
         }
+    }
+
+    void printSell(){
+        const auto & map_t = getSellMap();
+        for(auto it:map_t){
+            std::cout<<it.first<<": ";
+            for(auto itr:it.second){
+                std::cout<<"{"<<itr.getOrderId()<<", "<<itr.getRemainingQuantity()<<"}";
+            }
+            std::cout<<"\n";
+        }
+    }
+    
+    bool canMatch(Order &order){
+        const Price &price = order.getPrice();
+        const Side &side = order.getSide();
+        
+        if(side==Side::BUY){
+            // match with sell orders
+            if(m_sellMap.empty())return false;
+            if(price>m_sellMap.begin()->first)return true;
+        }
+        else{
+            //match with buy orders
+            if(m_buyMap.empty())return false;
+            if(price<=m_buyMap.begin()->first)return true;
+        }
+        return false;
+    }
+
+
+    Trades addOrder(OrderId orderid, Side side, Price price, Quantity quantity){
+        if(m_orderIndexMap.contains(orderid)){
+            return {}; 
+        }
+        Trades trades{};
         Order order{orderid,side,price,quantity};
+        if(canMatch(order)){
+            trades = matchOrder(order);
+        }
+        if(order.getRemainingQuantity()==0){
+            return trades;
+        }
+
         if(side==Side::BUY){
             OrderList &list = m_buyMap[price];
             auto it = list.emplace(
@@ -91,7 +222,8 @@ class OrderBook{
                         orderid,
                         side,
                         price,
-                        quantity
+                        quantity,
+                        order.getRemainingQuantity()
                         );
             m_orderIndexMap.emplace(orderid, OrderLocation{price,side,it});
         }
@@ -102,15 +234,16 @@ class OrderBook{
                         orderid,
                         side,
                         price,
-                        quantity
+                        quantity,
+                        order.getRemainingQuantity()
                         );
             m_orderIndexMap.emplace(orderid, OrderLocation{price,side,it});
         }
 
-        //invoke matching engine
+        return trades;
     }
 
-    void m_cancelOrder(OrderId orderid){
+    void cancelOrder(OrderId orderid){
 
         auto locationPtr = m_orderIndexMap.find(orderid);
         if(locationPtr==m_orderIndexMap.end()){
@@ -143,60 +276,100 @@ class OrderBook{
         // invoke matching engine
     }
 
-    void m_modifyOrder(OrderId orderId, Price newPrice, Quantity newQuantity){
+    void modifyOrder(OrderId orderId, Price newPrice, Quantity newQuantity){
         auto locationPtr = m_orderIndexMap.find(orderId);
         if(locationPtr == m_orderIndexMap.end()){
             return;
         }
         Side side = locationPtr->second.getSide();
-        m_cancelOrder(orderId);
-        m_addOrder(orderId,side,newPrice,newQuantity);
+        cancelOrder(orderId);
+        addOrder(orderId,side,newPrice,newQuantity);
 
         //invoke matching engine
     }
 
-    const BuyMap& getBuyMap() const{
-        return m_buyMap;
-    }
-    const SellMap& getSellMap() const{
-        return m_sellMap;
+    
+    Trades matchOrder(Order &order){
+        const Price &price = order.getPrice();
+        const Side &side = order.getSide();
+        Quantity buyQuantity = order.getRemainingQuantity();
+
+        Trades trades;
+        
+        if(side==Side::BUY){
+            // match with sell orders
+            std::vector<OrderId> removeOrders;
+            for(auto mapItr = m_sellMap.begin(); mapItr!=m_sellMap.end();){
+                if((mapItr->first) >price or (buyQuantity==0)){
+                    // return trades;
+                    break;
+                }
+                
+                for(auto it=mapItr->second.begin();it!=mapItr->second.end();){
+                    if(it->getRemainingQuantity()<=buyQuantity){
+                        buyQuantity -= it->getRemainingQuantity();
+                        trades.emplace_back(
+                            Trade{
+                                TradeInfo{order.getOrderId(),it->getPrice(), it->getRemainingQuantity()},
+                                TradeInfo{it->getOrderId(),it->getPrice(), it->getRemainingQuantity()},
+                            }
+                        );
+                        removeOrders.push_back(it->getOrderId());
+                        // mapItr->second.erase(it);
+                        // cancelOrder(it->getOrderId());
+                    }
+                    else{
+                        trades.emplace_back(
+                            Trade{
+                                TradeInfo{order.getOrderId(),it->getPrice(), buyQuantity},
+                                TradeInfo{it->getOrderId(),it->getPrice(), buyQuantity},
+                            }
+                        );
+                        it->setRemainingQuantity(it->getRemainingQuantity()-buyQuantity);
+                        buyQuantity=0;
+                        // break;
+                    }
+                    if(buyQuantity==0)break;
+                    it++;
+                }
+                mapItr++;
+            }
+
+            // if(buyQuantity!=0){
+                // order.setQuantity(buyQuantity);
+                order.setRemainingQuantity(buyQuantity);
+            // }
+            for(const auto &it: removeOrders){
+                cancelOrder(it);
+            }
+
+
+        }
+        else{
+            //match with buy orders
+
+        }
+        return trades;
     }
 
-    void printBuy(){
-        const auto &map_t = getBuyMap();
-        for(auto it:map_t){
-            std::cout<<it.first<<": ";
-            for(auto itr:it.second){
-                std::cout<<itr.getOrderId()<<" ";
-            }
-            std::cout<<"\n";
-        }
-    }
-
-    void printSell(){
-        const auto & map_t = getSellMap();
-        for(auto it:map_t){
-            std::cout<<it.first<<": ";
-            for(auto itr:it.second){
-                std::cout<<itr.getOrderId()<<" ";
-            }
-            std::cout<<"\n";
-        }
-    }
+   
 };
 
 int main(){
     OrderBook ob;
-    ob.m_addOrder(1,Side::BUY, 100,10);
-    ob.m_addOrder(2,Side::BUY, 130,17);
-    ob.m_addOrder(4,Side::BUY, 90,14);
+    ob.addOrder(1,Side::SELL, 100,10);
+    ob.addOrder(2,Side::SELL, 130,17);
+    ob.addOrder(4,Side::SELL, 90,14);
+
+    ob.printSell();
+    auto trades = ob.addOrder(3,Side::BUY, 100, 50);
+    for(auto it:trades){
+        std::cout<<it.getBuyTradeInfo().getPrice()<<" "<<it.getBuyTradeInfo().getQuantity()<<"\n";
+        std::cout<<it.getSellTradeInfo().getPrice()<<" "<<it.getSellTradeInfo().getQuantity()<<"\n\n";
+    }
 
     ob.printBuy();
-
-    ob.m_cancelOrder(4);
-    ob.printBuy();
-    ob.m_modifyOrder(2,50,10);
-    ob.printBuy();
+    ob.printSell();
 
 }
 
