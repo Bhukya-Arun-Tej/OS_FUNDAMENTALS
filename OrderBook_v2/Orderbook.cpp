@@ -140,7 +140,7 @@ bool Orderbook::canMatch(Order &order){
     if(side==Side::BUY){
         // match with sell orders
         if(m_sellMap.empty())return false;
-        if(price>m_sellMap.begin()->first)return true;
+        if(price>=m_sellMap.begin()->first)return true;
     }
     else{
         //match with buy orders
@@ -241,12 +241,12 @@ void Orderbook::modifyOrder(OrderId orderId, Price newPrice, Quantity newQuantit
 Trades Orderbook::matchOrder(Order &order){
     const Price &price = order.getPrice();
     const Side &side = order.getSide();
-    Quantity buyQuantity = order.getRemainingQuantity();
 
     Trades trades;
 
     if(side==Side::BUY){
         // match with sell orders
+        Quantity buyQuantity = order.getRemainingQuantity();
         std::vector<OrderId> removeOrders;
         for(auto mapItr = m_sellMap.begin(); mapItr!=m_sellMap.end();){
             if((mapItr->first) >price or (buyQuantity==0)){
@@ -291,12 +291,55 @@ Trades Orderbook::matchOrder(Order &order){
         for(const auto &it: removeOrders){
             cancelOrder(it);
         }
-
-
     }
     else{
         //match with buy orders
 
+        std::vector<OrderId> removeOrders;
+        Quantity sellQuantity = order.getRemainingQuantity();
+        for(auto mapItr = m_buyMap.begin(); mapItr!=m_buyMap.end();){
+            if((mapItr->first) < price or (sellQuantity==0)){
+                // return trades;
+                break;
+            }
+
+            for(auto it=mapItr->second.begin();it!=mapItr->second.end();){
+                if(it->getRemainingQuantity()<=sellQuantity){
+                    sellQuantity -= it->getRemainingQuantity();
+                    trades.emplace_back(
+                            Trade{
+                                    TradeInfo{it->getOrderId(),it->getPrice(), it->getRemainingQuantity()},
+                                    TradeInfo{order.getOrderId(),it->getPrice(), it->getRemainingQuantity()},
+                            }
+                    );
+                    removeOrders.push_back(it->getOrderId());
+                    // mapItr->second.erase(it);
+                    // cancelOrder(it->getOrderId());
+                }
+                else{
+                    trades.emplace_back(
+                            Trade{
+                                    TradeInfo{it->getOrderId(),it->getPrice(), sellQuantity},
+                                    TradeInfo{order.getOrderId(),it->getPrice(), sellQuantity},
+                            }
+                    );
+                    it->setRemainingQuantity(it->getRemainingQuantity()-sellQuantity);
+                    sellQuantity=0;
+                    // break;
+                }
+                if(sellQuantity==0)break;
+                it++;
+            }
+            mapItr++;
+        }
+
+        // if(buyQuantity!=0){
+        // order.setQuantity(buyQuantity);
+        order.setRemainingQuantity(sellQuantity);
+        // }
+        for(const auto &it: removeOrders){
+            cancelOrder(it);
+        }
     }
     return trades;
 }
