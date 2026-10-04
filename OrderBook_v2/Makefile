@@ -9,5 +9,8 @@ test:
 	
 	g++ -std=c++17 -Wall -Wextra -Wpedantic Orderbook.cpp Orderbook_test.cpp -o Orderbook_test
 	./Orderbook_test
+bench:
+	g++ -std=c++17 -O3 -DNDEBUG -march=native -Wall -Wextra -Wpedantic Orderbook.cpp Orderbook_benchmark.cpp -o Orderbook_benchmark
+	./Orderbook_benchmark
 clean:
-	rm -rf Orderbook Orderbook_test
+	rm -rf Orderbook Orderbook_test Orderbook_benchmark
