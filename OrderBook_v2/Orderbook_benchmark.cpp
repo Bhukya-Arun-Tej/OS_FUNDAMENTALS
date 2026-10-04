@@ -157,6 +157,152 @@ void calculateFullFillLatency(){
     std::cout << "benchmark sink: " << benchmarkSink << '\n';
 }
 
+void calculatePartialRestingFillLatency(){
+    // Makes the order-book result observable in an optimized build. Update it only after each timer stops, so it is not part of the measured latency.
+    volatile std::size_t benchmarkSink = 0;
+    for(int i=0;i<WarmupCount;++i){
+        Orderbook book;
+        book.addOrder(1,Side::BUY,100,20);
+        Trades trades = book.addOrder(2,Side::SELL,100,10);
+        benchmarkSink += trades.size()==1 && book.getSellMap().empty() && book.getBuyMap().size()==1 && book.getBuyMap().begin()->second.front().getRemainingQuantity()==10;
+    }
+
+    std::vector<long long> latencies;
+    latencies.reserve(SampleCount);
+    long long totalLatency =0ll;
+    for(int i=0;i<SampleCount;i++){
+        Orderbook book;
+        book.addOrder(1,Side::BUY,100,20);
+        const auto start = Clock::now();
+        Trades trades = book.addOrder(2,Side::SELL,100,10);
+        const auto end = Clock::now();
+        benchmarkSink += trades.size()==1 && book.getSellMap().empty() && book.getBuyMap().size()==1 && book.getBuyMap().begin()->second.front().getRemainingQuantity()==10;
+
+        const auto latency = std::chrono::duration_cast<std::chrono::nanoseconds> (end-start).count();
+        latencies.push_back(latency);
+        totalLatency+=latency;
+    }
+    std::cout<<"Recorded samples: "<<latencies.size()<<"\n";
+
+    const auto averageLatency = static_cast<double> (totalLatency) / latencies.size();
+    std::cout<<"average partial resting fill latency: "<<averageLatency<<" ns\n";
+
+    std::sort(latencies.begin(),latencies.end());
+    long long minLatency = latencies[0];
+    long long maxLatency = latencies.back();
+
+    std::cout<<"minimum partial resting fill latency: "<<minLatency<<" ns\n";
+    std::cout<<"maximum partial resting fill latency: "<<maxLatency<<" ns\n";
+
+    const auto middle = latencies.size()/2;
+    const double medianLatency = (static_cast<double> (latencies[middle-1]) + static_cast<double> (latencies[middle])) /2.0;
+    std::cout<<"median partial resting fill latency: "<<medianLatency<<" ns\n";
+
+    const auto p99Index = ((latencies.size())*99)/100 -1 ;
+    const auto p999Index = ((latencies.size())*999)/1000 -1 ;
+
+    const auto p99Latency = latencies[p99Index];
+    const auto p999Latency = latencies[p999Index];
+
+    std::cout<<"p99 partial resting fill latency: "<<p99Latency<<" ns\n";
+    std::cout<<"p99.9 partial resting fill latency: "<<p999Latency<<" ns\n";
+
+    std::vector<Orderbook> books(BatchSize);
+    for(int i=0;i<BatchSize;i++){
+        books[i].addOrder(1, Side::BUY,100,20);
+    }
+    const auto batchStart = Clock::now();
+    for(int i=0;i<BatchSize;i++){
+        books[i].addOrder(2, Side::SELL,100,10);
+    }
+    const auto batchEnd = Clock::now();
+
+    for(int i=0;i<BatchSize;i++){
+        benchmarkSink += books[i].getSellMap().empty() && books[i].getBuyMap().size()==1 && books[i].getBuyMap().begin()->second.front().getRemainingQuantity()==10;
+    }
+
+    const auto batchTotalLatency = std::chrono::duration_cast<std::chrono::nanoseconds>(batchEnd - batchStart).count();
+    const double batchAverageLatency = static_cast<double>(batchTotalLatency) / BatchSize;
+
+    std::cout<<"batched total latency: "<< batchTotalLatency<<" ns\n";
+    std::cout<<"batched average latency: "<<batchAverageLatency<<" ns\n";
+
+    std::cout << "benchmark sink: " << benchmarkSink << '\n';
+}
+
+void calculatePartialIncomingFillLatency(){
+    // Makes the order-book result observable in an optimized build. Update it only after each timer stops, so it is not part of the measured latency.
+    volatile std::size_t benchmarkSink = 0;
+    for(int i=0;i<WarmupCount;++i){
+        Orderbook book;
+        book.addOrder(1,Side::BUY,100,10);
+        Trades trades = book.addOrder(2,Side::SELL,100,20);
+        benchmarkSink += trades.size()==1 && book.getBuyMap().empty() && book.getSellMap().size()==1 && book.getSellMap().begin()->second.front().getRemainingQuantity()==10;
+    }
+
+    std::vector<long long> latencies;
+    latencies.reserve(SampleCount);
+    long long totalLatency =0ll;
+    for(int i=0;i<SampleCount;i++){
+        Orderbook book;
+        book.addOrder(1,Side::BUY,100,10);
+        const auto start = Clock::now();
+        Trades trades = book.addOrder(2,Side::SELL,100,20);
+        const auto end = Clock::now();
+        benchmarkSink += trades.size()==1 && book.getBuyMap().empty() && book.getSellMap().size()==1 && book.getSellMap().begin()->second.front().getRemainingQuantity()==10;
+
+        const auto latency = std::chrono::duration_cast<std::chrono::nanoseconds> (end-start).count();
+        latencies.push_back(latency);
+        totalLatency+=latency;
+    }
+    std::cout<<"Recorded samples: "<<latencies.size()<<"\n";
+
+    const auto averageLatency = static_cast<double> (totalLatency) / latencies.size();
+    std::cout<<"average partial incoming fill latency: "<<averageLatency<<" ns\n";
+
+    std::sort(latencies.begin(),latencies.end());
+    long long minLatency = latencies[0];
+    long long maxLatency = latencies.back();
+
+    std::cout<<"minimum partial incoming fill latency: "<<minLatency<<" ns\n";
+    std::cout<<"maximum partial incoming fill latency: "<<maxLatency<<" ns\n";
+
+    const auto middle = latencies.size()/2;
+    const double medianLatency = (static_cast<double> (latencies[middle-1]) + static_cast<double> (latencies[middle])) /2.0;
+    std::cout<<"median partial incoming fill latency: "<<medianLatency<<" ns\n";
+
+    const auto p99Index = ((latencies.size())*99)/100 -1 ;
+    const auto p999Index = ((latencies.size())*999)/1000 -1 ;
+
+    const auto p99Latency = latencies[p99Index];
+    const auto p999Latency = latencies[p999Index];
+
+    std::cout<<"p99 partial incoming fill latency: "<<p99Latency<<" ns\n";
+    std::cout<<"p99.9 partial incoming fill latency: "<<p999Latency<<" ns\n";
+
+    std::vector<Orderbook> books(BatchSize);
+    for(int i=0;i<BatchSize;i++){
+        books[i].addOrder(1, Side::BUY,100,10);
+    }
+    const auto batchStart = Clock::now();
+    for(int i=0;i<BatchSize;i++){
+        books[i].addOrder(2, Side::SELL,100,20);
+    }
+    const auto batchEnd = Clock::now();
+
+    for(int i=0;i<BatchSize;i++){
+        benchmarkSink += books[i].getBuyMap().empty() && books[i].getSellMap().size()==1 && books[i].getSellMap().begin()->second.front().getRemainingQuantity()==10;
+    }
+
+    const auto batchTotalLatency = std::chrono::duration_cast<std::chrono::nanoseconds>(batchEnd - batchStart).count();
+    const double batchAverageLatency = static_cast<double>(batchTotalLatency) / BatchSize;
+
+    std::cout<<"batched total latency: "<< batchTotalLatency<<" ns\n";
+    std::cout<<"batched average latency: "<<batchAverageLatency<<" ns\n";
+
+    std::cout << "benchmark sink: " << benchmarkSink << '\n';
+}
+
 int main(){
     std::cout<<"-------addOrder Latency-------";
     calcualteAddOrderLatency();
@@ -166,6 +312,14 @@ int main(){
     std::cout<<"-------full fill Latency-------";
     calculateFullFillLatency();
     std::cout<<"-------full fill Latency------- \n\n";
+
+    std::cout<<"-------partial resting fill Latency-------";
+    calculatePartialRestingFillLatency();
+    std::cout<<"-------partial resting fill Latency------- \n\n";
+
+    std::cout<<"-------partial incoming fill Latency-------";
+    calculatePartialIncomingFillLatency();
+    std::cout<<"-------partial incoming fill Latency------- \n\n";
 
     return 0;
 }
