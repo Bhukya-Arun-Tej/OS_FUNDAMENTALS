@@ -303,6 +303,85 @@ void calculatePartialIncomingFillLatency(){
     std::cout << "benchmark sink: " << benchmarkSink << '\n';
 }
 
+void calculateMultiLevelSweepLatency(){
+    // Makes the order-book result observable in an optimized build. Update it only after each timer stops, so it is not part of the measured latency.
+    volatile std::size_t benchmarkSink = 0;
+    for(int i=0;i<WarmupCount;++i){
+        Orderbook book;
+        book.addOrder(1,Side::BUY,102,10);
+        book.addOrder(2,Side::BUY,101,10);
+        book.addOrder(3,Side::BUY,100,10);
+        Trades trades = book.addOrder(4,Side::SELL,100,25);
+        benchmarkSink += trades.size()==3 && book.getSellMap().empty() && book.getBuyMap().size()==1 && book.getBuyMap().begin()->first==100 && book.getBuyMap().begin()->second.front().getOrderId()==3 && book.getBuyMap().begin()->second.front().getRemainingQuantity()==5;
+    }
+
+    std::vector<long long> latencies;
+    latencies.reserve(SampleCount);
+    long long totalLatency =0ll;
+    for(int i=0;i<SampleCount;i++){
+        Orderbook book;
+        book.addOrder(1,Side::BUY,102,10);
+        book.addOrder(2,Side::BUY,101,10);
+        book.addOrder(3,Side::BUY,100,10);
+        const auto start = Clock::now();
+        Trades trades = book.addOrder(4,Side::SELL,100,25);
+        const auto end = Clock::now();
+        benchmarkSink += trades.size()==3 && book.getSellMap().empty() && book.getBuyMap().size()==1 && book.getBuyMap().begin()->first==100 && book.getBuyMap().begin()->second.front().getOrderId()==3 && book.getBuyMap().begin()->second.front().getRemainingQuantity()==5;
+
+        const auto latency = std::chrono::duration_cast<std::chrono::nanoseconds> (end-start).count();
+        latencies.push_back(latency);
+        totalLatency+=latency;
+    }
+    std::cout<<"Recorded samples: "<<latencies.size()<<"\n";
+
+    const auto averageLatency = static_cast<double> (totalLatency) / latencies.size();
+    std::cout<<"average multi level sweep latency: "<<averageLatency<<" ns\n";
+
+    std::sort(latencies.begin(),latencies.end());
+    long long minLatency = latencies[0];
+    long long maxLatency = latencies.back();
+
+    std::cout<<"minimum multi level sweep latency: "<<minLatency<<" ns\n";
+    std::cout<<"maximum multi level sweep latency: "<<maxLatency<<" ns\n";
+
+    const auto middle = latencies.size()/2;
+    const double medianLatency = (static_cast<double> (latencies[middle-1]) + static_cast<double> (latencies[middle])) /2.0;
+    std::cout<<"median multi level sweep latency: "<<medianLatency<<" ns\n";
+
+    const auto p99Index = ((latencies.size())*99)/100 -1 ;
+    const auto p999Index = ((latencies.size())*999)/1000 -1 ;
+
+    const auto p99Latency = latencies[p99Index];
+    const auto p999Latency = latencies[p999Index];
+
+    std::cout<<"p99 multi level sweep latency: "<<p99Latency<<" ns\n";
+    std::cout<<"p99.9 multi level sweep latency: "<<p999Latency<<" ns\n";
+
+    std::vector<Orderbook> books(BatchSize);
+    for(int i=0;i<BatchSize;i++){
+        books[i].addOrder(1, Side::BUY,102,10);
+        books[i].addOrder(2, Side::BUY,101,10);
+        books[i].addOrder(3, Side::BUY,100,10);
+    }
+    const auto batchStart = Clock::now();
+    for(int i=0;i<BatchSize;i++){
+        books[i].addOrder(4, Side::SELL,100,25);
+    }
+    const auto batchEnd = Clock::now();
+
+    for(int i=0;i<BatchSize;i++){
+        benchmarkSink += books[i].getSellMap().empty() && books[i].getBuyMap().size()==1 && books[i].getBuyMap().begin()->first==100 && books[i].getBuyMap().begin()->second.front().getOrderId()==3 && books[i].getBuyMap().begin()->second.front().getRemainingQuantity()==5;
+    }
+
+    const auto batchTotalLatency = std::chrono::duration_cast<std::chrono::nanoseconds>(batchEnd - batchStart).count();
+    const double batchAverageLatency = static_cast<double>(batchTotalLatency) / BatchSize;
+
+    std::cout<<"batched total latency: "<< batchTotalLatency<<" ns\n";
+    std::cout<<"batched average latency: "<<batchAverageLatency<<" ns\n";
+
+    std::cout << "benchmark sink: " << benchmarkSink << '\n';
+}
+
 int main(){
     std::cout<<"-------addOrder Latency-------";
     calcualteAddOrderLatency();
@@ -320,6 +399,10 @@ int main(){
     std::cout<<"-------partial incoming fill Latency-------";
     calculatePartialIncomingFillLatency();
     std::cout<<"-------partial incoming fill Latency------- \n\n";
+
+    std::cout<<"-------multi level sweep Latency-------";
+    calculateMultiLevelSweepLatency();
+    std::cout<<"-------multi level sweep Latency------- \n\n";
 
     return 0;
 }
