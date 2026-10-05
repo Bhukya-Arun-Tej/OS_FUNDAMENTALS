@@ -18,27 +18,31 @@ int main(){
     receiverAddress.sin_port = htons(Port);
     receiverAddress.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-    const char message[]  = "Hello from UDP publisher";
+    
 
-    const ssize_t bytesSent = sendto(
-        socketFd,
-        message,
-        sizeof(message)-1,
-        0,
-        reinterpret_cast<sockaddr*>(&receiverAddress),
-        sizeof(receiverAddress)
-    );
+    for(std::uint32_t sequence = 1; sequence<=10; sequence++){
+        if(sequence==5)continue;
+        const std::string message = std::to_string(sequence);
 
-    if(bytesSent<0){
-        std::cerr<<"Could not send UDP message\n";
-        close(socketFd);
-        return 1;
+        const ssize_t bytesSent = sendto(
+            socketFd,
+            message.data(),
+            message.size(),
+            0,
+            reinterpret_cast<sockaddr*>(&receiverAddress),
+            sizeof(receiverAddress)
+        );
+
+        if(bytesSent<0){
+            std::cerr<<"Could not send UDP message\n";
+            close(socketFd);
+            return 1;
+        }
+
+        std::cout<<"Sent sequence: "<<sequence<<"\n";
+        sleep(1);
     }
-
-    std::cout<<"Sent: "<<bytesSent<<" bytes\n";
     close(socketFd);
     return 0;
-
-
 
 }

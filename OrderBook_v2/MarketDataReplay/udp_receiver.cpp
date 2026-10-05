@@ -23,26 +23,46 @@ int main(){
         return 1;
     }
 
-    char buffer[1024]{};
+    
     sockaddr_in senderAddress{};
     socklen_t senderAddressLength = sizeof(senderAddress);
 
-    const ssize_t bytesReceived = recvfrom(
-        socketFd,
-        buffer,
-        sizeof(buffer)-1,
-        0,
-        reinterpret_cast<sockaddr*>(&senderAddress),
-        &senderAddressLength
-    );
+    std::uint32_t expected = 1;
 
-    if(bytesReceived<0){
-        std::cerr<<"Could not receive UDP message\n";
-        return 1;
+    while(expected<=10){
+
+        char buffer[1024]{};
+        const ssize_t bytesReceived = recvfrom(
+            socketFd,
+            buffer,
+            sizeof(buffer)-1,
+            0,
+            reinterpret_cast<sockaddr*>(&senderAddress),
+            &senderAddressLength
+        );
+
+        if(bytesReceived<0){
+            std::cerr<<"Could not receive UDP message\n";
+            return 1;
+        }
+
+        buffer[bytesReceived]='\0';
+        const std::uint32_t received = std::stoull(buffer);
+
+        if(received==expected){
+            std::cout<<"Received sequence: "<<received<<" \n";
+            ++expected;
+        }
+        else if(received> expected){
+            std::cout<<"Missing sequences from: "<<expected<<" to "<<received-1<<"\n";
+            expected = received+1;
+        }
+        else{
+            std::cout<<"Duplicate sequence "<<received<<"\n";
+        }
+        
     }
 
-    buffer[bytesReceived]='\0';
-    std::cout<<"Received: "<<buffer<<" \n";
     close(socketFd);
     return 0;
 
