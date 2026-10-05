@@ -9,5 +9,9 @@ udp_publisher: udp_publisher.cpp protocol.cpp protocol.hpp
 udp_receiver: udp_receiver.cpp protocol.cpp protocol.hpp
 	$(CXX) $(CXXFLAGS) udp_receiver.cpp protocol.cpp -o udp_receiver
 
+test: protocol.cpp protocol.hpp protocol_test.cpp
+	$(CXX) $(CXXFLAGS) protocol.cpp protocol_test.cpp -o protocol_test
+	./protocol_test
+
 clean: 
-	rm -f udp_publisher udp_receiver
+	rm -f udp_publisher udp_receiver protocol_test
