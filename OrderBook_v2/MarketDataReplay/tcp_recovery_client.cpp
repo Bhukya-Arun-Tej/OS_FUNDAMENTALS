@@ -28,4 +28,5 @@ int main(){
 
     std::cout<<"Connected to TCP recovery server\n";
     close(socketFd);
+    return 0;
 }   
