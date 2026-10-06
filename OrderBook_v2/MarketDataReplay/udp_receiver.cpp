@@ -8,14 +8,14 @@
 constexpr std::uint16_t Port = 5000;
 
 int main(){
-    const int socketFd = socket(PF_INET,SOCK_DGRAM,0);
+    const int socketFd = socket(AF_INET,SOCK_DGRAM,0);
     if(socketFd<0){
         std::cerr<<"Could not create UDP socket\n";
         return 1;
     }
 
     sockaddr_in receiverAddress{};
-    receiverAddress.sin_family = PF_INET;
+    receiverAddress.sin_family = AF_INET;
     receiverAddress.sin_port = htons(Port);
     receiverAddress.sin_addr.s_addr = htonl(INADDR_ANY);
 
@@ -24,8 +24,6 @@ int main(){
         return 1;
     }
 
-    
-    
 
     std::uint32_t expected = 1;
 
@@ -69,15 +67,6 @@ int main(){
         else{
             std::cout<<"Duplicate sequence "<<received<<"\n";
         }
-
-        // buffer[bytesReceived]='\0';
-        // const std::uint32_t received = std::stoull(buffer);
-
-        
-
-        
-        
-
     }
 
     close(socketFd);

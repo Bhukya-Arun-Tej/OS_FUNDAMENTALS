@@ -9,14 +9,14 @@
 constexpr std::uint16_t Port = 5000;
 
 int main(){
-    const int socketFd = socket(PF_INET,SOCK_DGRAM,0);
+    const int socketFd = socket(AF_INET,SOCK_DGRAM,0);
     if(socketFd<0){
         std::cerr<<"Could not create UDP socket\n";
         return 1;
     }
 
     sockaddr_in receiverAddress{};
-    receiverAddress.sin_family = PF_INET;
+    receiverAddress.sin_family = AF_INET;
     receiverAddress.sin_port = htons(Port);
     receiverAddress.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
@@ -29,6 +29,13 @@ int main(){
         const FeedPacket packet = FeedPacket{sequence, MessageType::Test, "Test message"};
         const std::vector<std::uint8_t>  encodedBytes = encodePacket(packet);
 
+        if (encodedBytes.empty()) {
+            std::cerr << "Could not encode packet\n";
+            close(socketFd);
+            return 1;
+        }
+
+
         const ssize_t bytesSent = sendto(
             socketFd,
             encodedBytes.data(),
@@ -40,6 +47,12 @@ int main(){
 
         if(bytesSent<0){
             std::cerr<<"Could not send UDP message\n";
+            close(socketFd);
+            return 1;
+        }
+
+        if (static_cast<std::size_t>(bytesSent) != encodedBytes.size()) {
+            std::cerr << "UDP packet was not fully sent\n";
             close(socketFd);
             return 1;
         }
