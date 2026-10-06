@@ -1,8 +1,13 @@
 .aider*
 
 # Generated MarketDataReplay executables
-  /OrderBook_v2/MarketDataReplay/udp_publisher
-  /OrderBook_v2/MarketDataReplay/udp_receiver
-  /OrderBook_v2/MarketDataReplay/protocol_test
-  /OrderBook_v2/MarketDataReplay/tcp_recovery_server
-  /OrderBook_v2/MarketDataReplay/tcp_recovery_client
+/OrderBook_v2/MarketDataReplay/udp_publisher
+/OrderBook_v2/MarketDataReplay/udp_receiver
+/OrderBook_v2/MarketDataReplay/protocol_test
+/OrderBook_v2/MarketDataReplay/tcp_recovery_server
+/OrderBook_v2/MarketDataReplay/tcp_recovery_client
+
+# Generated OrderBook executables
+/OrderBook_v2/Orderbook
+/OrderBook_v2/Orderbook_benchmark
+/OrderBook_v2/Orderbook_test
