@@ -3,6 +3,7 @@
 #include <iostream>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include "protocol.hpp"
 
 constexpr std::uint16_t Port = 5000;
 
@@ -24,18 +25,19 @@ int main(){
     }
 
     
-    sockaddr_in senderAddress{};
-    socklen_t senderAddressLength = sizeof(senderAddress);
+    
 
     std::uint32_t expected = 1;
 
     while(expected<=10){
 
-        char buffer[1024]{};
+        std::uint8_t buffer[1024]{};
+        sockaddr_in senderAddress{};
+        socklen_t senderAddressLength = sizeof(senderAddress);
         const ssize_t bytesReceived = recvfrom(
             socketFd,
             buffer,
-            sizeof(buffer)-1,
+            sizeof(buffer),
             0,
             reinterpret_cast<sockaddr*>(&senderAddress),
             &senderAddressLength
@@ -46,8 +48,14 @@ int main(){
             return 1;
         }
 
-        buffer[bytesReceived]='\0';
-        const std::uint32_t received = std::stoull(buffer);
+        const std::size_t receivedLength = static_cast<std::size_t> (bytesReceived);
+
+        FeedPacket receivedPacket;
+        if(!decodePacket(buffer,receivedLength, receivedPacket)){
+            std::cerr<<"Packet corrupted. Could not decode\n";
+            continue;
+        }
+        std::uint32_t received = receivedPacket.sequenceNumber;
 
         if(received==expected){
             std::cout<<"Received sequence: "<<received<<" \n";
@@ -55,12 +63,21 @@ int main(){
         }
         else if(received> expected){
             std::cout<<"Missing sequences from: "<<expected<<" to "<<received-1<<"\n";
+            std::cout<<"Received sequence: "<<received<<" \n";
             expected = received+1;
         }
         else{
             std::cout<<"Duplicate sequence "<<received<<"\n";
         }
+
+        // buffer[bytesReceived]='\0';
+        // const std::uint32_t received = std::stoull(buffer);
+
         
+
+        
+        
+
     }
 
     close(socketFd);

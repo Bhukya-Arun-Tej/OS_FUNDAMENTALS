@@ -3,6 +3,8 @@
 #include <iostream>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <vector>
+#include "protocol.hpp"
 
 constexpr std::uint16_t Port = 5000;
 
@@ -22,12 +24,15 @@ int main(){
 
     for(std::uint32_t sequence = 1; sequence<=10; sequence++){
         if(sequence==5)continue;
-        const std::string message = std::to_string(sequence);
+        // const std::string message = std::to_string(sequence);
+
+        const FeedPacket packet = FeedPacket{sequence, MessageType::Test, "Test message"};
+        const std::vector<std::uint8_t>  encodedBytes = encodePacket(packet);
 
         const ssize_t bytesSent = sendto(
             socketFd,
-            message.data(),
-            message.size(),
+            encodedBytes.data(),
+            encodedBytes.size(),
             0,
             reinterpret_cast<sockaddr*>(&receiverAddress),
             sizeof(receiverAddress)
