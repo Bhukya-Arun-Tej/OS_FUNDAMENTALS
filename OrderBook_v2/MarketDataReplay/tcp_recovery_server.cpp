@@ -4,6 +4,11 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <cstdint>
+#include <limits>
+#include <vector>
+#include <string>
+#include "tcphelper.hpp"
+#include "protocol.hpp"
 
 
 constexpr std::uint16_t Port = 5001;
@@ -43,17 +48,62 @@ int main(){
 
     std::cout<<"Starting TCP server...\n";
     while(1){
-        sockaddr clientAddress;
+        sockaddr_in clientAddress;
         socklen_t clientLength = sizeof(clientAddress);
-        int clientFd = accept(socketFd,&clientAddress,&clientLength);
+        int clientFd = accept(socketFd,reinterpret_cast<sockaddr*>(&clientAddress),&clientLength);
         if(clientFd<0){
             std::cerr<<"Could not accept a connection\n";
             continue;
         }   
-
         std::cout<<"TCP recovery client connected\n";
+
+        std::uint32_t firstMissingSequenceNetwork{};
+        std::uint32_t lastMissingSequenceNetwork{};
+        if(!receiveAll(clientFd, reinterpret_cast<std::uint8_t*> (&firstMissingSequenceNetwork), sizeof(firstMissingSequenceNetwork))){
+            std::cerr<<"Could not receive the first missing sequence\n";
+            close(clientFd);
+            continue;
+        }
+        if(!receiveAll(clientFd, reinterpret_cast<std::uint8_t*> (&lastMissingSequenceNetwork), sizeof(lastMissingSequenceNetwork))){
+            std::cerr<<"Could not receive the last missing sequence\n";
+            close(clientFd);
+            continue;
+        }
+
+        const std::uint32_t firstMissing = ntohl(firstMissingSequenceNetwork);
+        const std::uint32_t lastMissing = ntohl(lastMissingSequenceNetwork);
+        if (firstMissing > lastMissing) {
+            std::cerr << "Invalid recovery sequence range\n";
+            close(clientFd);
+            continue;
+        }
+
+        std::cout<<"Recover requested for sequence "<<firstMissing<<" through "<<lastMissing<<"\n"; 
+
+        for(std::uint32_t sequence = firstMissing; sequence<=lastMissing; sequence++){
+            FeedPacket dummy{sequence,MessageType::Test, "Dummy Missing packet "+std::to_string(sequence)};
+            const std::vector<std::uint8_t> encodedPacket =  encodePacket(dummy);
+            
+            if(encodedPacket.empty() || encodedPacket.size()> std::numeric_limits<std::uint32_t>::max()){
+                std::cerr<<"Could not encode recovery packet\n";
+                break;
+            }
+            const std::uint32_t packetLengthNetwork = htonl(static_cast<std::uint32_t>(encodedPacket.size()));
+
+            if(!sendAll(clientFd, reinterpret_cast<const std::uint8_t*> (&packetLengthNetwork) , sizeof(packetLengthNetwork))){
+                std::cerr<<"Error sending the requested packet length for the sequence- "<<sequence<<"\n";
+                break;
+            }
+
+            if(!sendAll(clientFd, encodedPacket.data(), encodedPacket.size())){
+                std::cerr<<"Error sending the requested packet for sequence number - "<<sequence<<"\n";
+                break;
+            }
+        }
+        
         close(clientFd);
     }
 
+    return 0;
 
 }   

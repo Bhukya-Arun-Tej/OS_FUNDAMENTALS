@@ -8,6 +8,7 @@
 inline constexpr std::uint32_t FeedMagic = 0xFFFFFFFF;
 inline constexpr std::uint16_t FeedVersion = 1;
 inline constexpr std::size_t PacketHeaderSize = 14;
+inline constexpr std::uint32_t MaxPacketLength = 1024;
 using PayloadLength = std::uint16_t;
 
 enum class MessageType: std::uint16_t{
