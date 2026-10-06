@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include "protocol.hpp"
+#include "tcp_recovery_client.hpp"
 
 constexpr std::uint16_t Port = 5000;
 
@@ -61,11 +62,21 @@ int main(){
         }
         else if(received> expected){
             std::cout<<"Missing sequences from: "<<expected<<" to "<<received-1<<"\n";
+            std::cout<<"Fetching missing packets from TCP server\n";
+            std::vector<FeedPacket> recoveredPackets;
+            if(!recoverMissingPackets(expected,received-1,recoveredPackets)){
+                std::cerr<<"Could not receive missing packets\n";
+                return 1;
+            }
+            for(const auto& packet:recoveredPackets){
+                std::cout<<"Received sequence: "<<packet.sequenceNumber<<"\n";
+            }
             std::cout<<"Received sequence: "<<received<<" \n";
+
             expected = received+1;
         }
         else{
-            std::cout<<"Duplicate sequence "<<received<<"\n";
+            std::cout<<"Duplicate sequence: "<<received<<". Dropping packet\n";
         }
     }
 

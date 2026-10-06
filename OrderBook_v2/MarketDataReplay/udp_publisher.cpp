@@ -23,7 +23,7 @@ int main(){
     
 
     for(std::uint32_t sequence = 1; sequence<=10; sequence++){
-        if(sequence==5)continue;
+        if(sequence==5 || sequence==6)continue;
         // const std::string message = std::to_string(sequence);
 
         const FeedPacket packet = FeedPacket{sequence, MessageType::Test, "Test message"};
