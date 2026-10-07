@@ -4,6 +4,8 @@
 /OrderBook_v2/MarketDataReplay/udp_publisher
 /OrderBook_v2/MarketDataReplay/udp_receiver
 /OrderBook_v2/MarketDataReplay/protocol_test
+/OrderBook_v2/MarketDataReplay/feed_history
+/OrderBook_v2/MarketDataReplay/feed_history_test
 /OrderBook_v2/MarketDataReplay/tcp_recovery_server
 /OrderBook_v2/MarketDataReplay/tcp_recovery_client
 
