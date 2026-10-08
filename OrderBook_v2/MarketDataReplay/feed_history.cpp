@@ -17,7 +17,11 @@ void FeedHistory::store(std::uint32_t sequenceNumber, const std::vector<std::uin
       throw std::invalid_argument("Sequence number must be positive");
     }
     const std::size_t index = (sequenceNumber-1) & (m_capacity-1);
-    m_history[index] = {sequenceNumber, bytes}; 
+    
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_history[index] = {sequenceNumber, bytes}; 
+    }
 }
 
 bool FeedHistory::find(std::uint32_t sequenceNumber, std::vector<std::uint8_t>& result)const{
@@ -25,11 +29,16 @@ bool FeedHistory::find(std::uint32_t sequenceNumber, std::vector<std::uint8_t>& 
         return false;
     }
     const std::size_t index = (sequenceNumber-1) & (m_capacity-1);
-    const StoredPacket &packet = m_history[index];
-    if(packet.sequenceNumber != sequenceNumber){
-        return false;
+    
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        const StoredPacket &packet = m_history[index];
+            
+        if(packet.sequenceNumber != sequenceNumber){
+            return false;
+        }
+        result = packet.bytes;
     }
-    result = packet.bytes;
     return true;
 }
 

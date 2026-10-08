@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 #include <cstddef>
+#include <mutex>
 
 
 //Stored encoded packet bytes for TCP recovery
@@ -16,6 +17,7 @@ class FeedHistory{
     private:
         std::vector<StoredPacket>m_history;
         std::size_t m_capacity;
+        mutable std::mutex m_mutex;
 
     public:
         explicit FeedHistory(std::size_t capacity);
