@@ -5,7 +5,7 @@
 #include <thread>
 
 int main(){
-    FeedHistory history{1024};
+    FeedHistory history{(1<<20)};
 
     std::thread tcpRecoveryThread(runTcpRecoveryServer,std::cref(history));
     const int producer = runFeedProducer(history);

@@ -94,7 +94,7 @@ int runTcpRecoveryServer(const FeedHistory& history){
 
         const std::uint32_t firstMissing = ntohl(firstMissingSequenceNetwork);
         const std::uint32_t lastMissing = ntohl(lastMissingSequenceNetwork);
-        if (firstMissing > lastMissing) {
+        if (firstMissing==0 || firstMissing > lastMissing) {
             std::cerr << "Invalid recovery sequence range\n";
             close(clientFd);
             continue;

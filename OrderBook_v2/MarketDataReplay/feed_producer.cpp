@@ -29,8 +29,10 @@ int runFeedProducer(FeedHistory& history){
         history.store(sequence,encodedBytes);
         if(sequence == 5 || sequence == 6) {
             std::cout<<"Intentionally dropped UDP sequence: "<<sequence<<"\n";
+            sleep(1);
             continue;
         }
+        std::cerr<<"Sending the sequence: "<<sequence<<"\n";
         
         if(!publishBytesUDP(udpSocketFd,encodedBytes)){
             std::cerr<<"UDP publish failure\n";

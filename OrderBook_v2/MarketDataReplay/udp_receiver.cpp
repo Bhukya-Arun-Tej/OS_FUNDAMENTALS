@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include "protocol.hpp"
 #include "tcp_recovery_client.hpp"
+#include "packet_sequencer.hpp"
 
 constexpr std::uint16_t Port = 5000;
 
@@ -22,15 +23,17 @@ int main(){
 
     if(bind(socketFd, reinterpret_cast<sockaddr*>(&receiverAddress), sizeof(receiverAddress))<0 ){
         std::cerr<<"Could not bind UDP socket\n";
+        close(socketFd);
         return 1;
     }
 
 
     std::uint32_t expected = 1;
+    std::vector<PendingPacketSlot> packetBuffer(BUFFERSIZE);
 
     while(expected<=10){
 
-        std::uint8_t buffer[1024]{};
+        std::uint8_t buffer[MaxPacketLength]{};
         sockaddr_in senderAddress{};
         socklen_t senderAddressLength = sizeof(senderAddress);
         const ssize_t bytesReceived = recvfrom(
@@ -44,6 +47,7 @@ int main(){
 
         if(bytesReceived<0){
             std::cerr<<"Could not receive UDP message\n";
+            close(socketFd);
             return 1;
         }
 
@@ -55,29 +59,44 @@ int main(){
             continue;
         }
         std::uint32_t received = receivedPacket.sequenceNumber;
-
-        if(received==expected){
-            std::cout<<"Received sequence: "<<received<<" \n";
-            ++expected;
+        if(received == 0) {
+            std::cerr<<"Invalid sequence number\n";
+            continue;
         }
-        else if(received> expected){
+        if(received<expected){
+            std::cout<<"Duplicate sequence detected. Discarding it\n";
+            continue;
+        }
+        if(received - expected >= BUFFERSIZE) {
+            std::cerr<<"Packet exceeds pending-buffer window; resync needed\n";
+            close(socketFd);
+            return 1;
+        }
+        std::size_t bufferIndex = (received-1) & (BUFFERSIZE-1);
+        packetBuffer[bufferIndex] = PendingPacketSlot{received,true,receivedPacket};
+
+
+        drainPendingPackets(packetBuffer,expected);
+
+        if(expected<received){
             std::cout<<"Missing sequences from: "<<expected<<" to "<<received-1<<"\n";
             std::cout<<"Fetching missing packets from TCP server\n";
             std::vector<FeedPacket> recoveredPackets;
             if(!recoverMissingPackets(expected,received-1,recoveredPackets)){
                 std::cerr<<"Could not receive missing packets\n";
+                close(socketFd);
                 return 1;
             }
-            for(const auto& packet:recoveredPackets){
-                std::cout<<"Received sequence: "<<packet.sequenceNumber<<"\n";
-            }
-            std::cout<<"Received sequence: "<<received<<" \n";
 
-            expected = received+1;
+            for(const auto& packet:recoveredPackets){
+                const std::size_t bufferIndex = (packet.sequenceNumber-1) & (BUFFERSIZE-1);
+                packetBuffer[bufferIndex] = PendingPacketSlot{packet.sequenceNumber,true,packet};
+            }
+            std::cout<<"Recovered Packets start\n";
+            drainPendingPackets(packetBuffer,expected);
+            std::cout<<"Recovered Packets end:\n";
         }
-        else{
-            std::cout<<"Duplicate sequence: "<<received<<". Dropping packet\n";
-        }
+        
     }
 
     close(socketFd);

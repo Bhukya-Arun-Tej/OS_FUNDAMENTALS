@@ -51,7 +51,9 @@ std::vector<std::uint8_t> encodePacket(const FeedPacket& packet){
     if(packet.payload.size() > std::numeric_limits<PayloadLength>::max()){
         return {};
     }
-    
+    if (packet.sequenceNumber == 0 || packet.payload.size()>MaxPacketLength-PacketHeaderSize) {
+        return {};
+    }
     if (packet.messageType != MessageType::Test) {
         return {};
     }
