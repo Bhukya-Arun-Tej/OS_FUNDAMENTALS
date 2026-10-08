@@ -6,22 +6,44 @@
 #include <cstdint>
 #include <limits>
 #include <vector>
-#include <string>
 #include "tcphelper.hpp"
-#include "protocol.hpp"
+#include "feed_history.hpp"
+#include "tcp_recovery_server.hpp"
 
 
 constexpr std::uint16_t Port = 5001;
 constexpr int Limit = 10;
 const int reuseAddress = 1;
-int main(){
+
+bool publishBytesTCP(int clientFd, const std::vector<std::uint8_t> &encodedPacket){
+    if(encodedPacket.empty() || encodedPacket.size()> std::numeric_limits<std::uint32_t>::max()){
+        std::cerr<<"Invalud recovery packet size\n";
+        return false;
+    }
+
+    const std::uint32_t packetLengthNetwork = htonl(static_cast<std::uint32_t>(encodedPacket.size()));
+
+    if(!sendAll(clientFd, reinterpret_cast<const std::uint8_t*> (&packetLengthNetwork) , sizeof(packetLengthNetwork))){
+        std::cerr<<"Error sending the requested packet length\n";
+        return false;
+    }
+
+    if(!sendAll(clientFd, encodedPacket.data(), encodedPacket.size())){
+        std::cerr<<"Error sending the requested packet\n";
+        return false;
+    }
+    return true;
+}
+
+
+int runTcpRecoveryServer(const FeedHistory& history){
     const int socketFd = socket(AF_INET,SOCK_STREAM,0);
     if(socketFd<0){
         std::cerr<<"Could not create TCP socket\n";
         return 1;
     }
 
-      if (setsockopt(socketFd,SOL_SOCKET,SO_REUSEADDR,&reuseAddress,sizeof(reuseAddress))<0){
+    if (setsockopt(socketFd,SOL_SOCKET,SO_REUSEADDR,&reuseAddress,sizeof(reuseAddress))<0){
         std::cerr << "Could not enable address reuse\n";
         close(socketFd);
         return 1;
@@ -81,24 +103,20 @@ int main(){
         std::cout<<"Recover requested for sequence "<<firstMissing<<" through "<<lastMissing<<"\n"; 
 
         for(std::uint32_t sequence = firstMissing; sequence<=lastMissing; sequence++){
-            FeedPacket dummy{sequence,MessageType::Test, "Dummy Missing packet "+std::to_string(sequence)};
-            const std::vector<std::uint8_t> encodedPacket =  encodePacket(dummy);
             
-            if(encodedPacket.empty() || encodedPacket.size()> std::numeric_limits<std::uint32_t>::max()){
-                std::cerr<<"Could not encode recovery packet\n";
-                break;
-            }
-            const std::uint32_t packetLengthNetwork = htonl(static_cast<std::uint32_t>(encodedPacket.size()));
-
-            if(!sendAll(clientFd, reinterpret_cast<const std::uint8_t*> (&packetLengthNetwork) , sizeof(packetLengthNetwork))){
-                std::cerr<<"Error sending the requested packet length for the sequence- "<<sequence<<"\n";
+            std::vector<std::uint8_t> encodedPacket;
+            
+            //fetch the encoded bytes from recovery history
+            if(!history.find(sequence,encodedPacket)){
+                std::cerr<<"Feed history not found\n";
                 break;
             }
 
-            if(!sendAll(clientFd, encodedPacket.data(), encodedPacket.size())){
-                std::cerr<<"Error sending the requested packet for sequence number - "<<sequence<<"\n";
+
+            if(!publishBytesTCP(clientFd, encodedPacket)){
                 break;
             }
+            
         }
         
         close(clientFd);
