@@ -209,3 +209,35 @@ bool decodeAddOrderPayload(const std::vector<std::uint8_t>& payload,AddOrderEven
     return true;
 }
 
+std::vector<std::uint8_t> encodeCancelOrderPayload( const CancelOrderEvent& event){
+
+    if(event.orderId==0){
+        return {};
+    }
+    std::vector<std::uint8_t> buffer{};
+    buffer.reserve(CancelOrderPayloadSize);
+    protocol::pushUint64(buffer,event.orderId);
+    return buffer;
+}
+
+
+bool decodeCancelOrderPayload(const std::vector<std::uint8_t>& payload,CancelOrderEvent& event){
+    std::size_t length = CancelOrderPayloadSize;
+    if(payload.size()!=length){
+        return false;
+    }
+    const std::uint8_t *data = payload.data();
+
+    if(data == nullptr){
+        return false;
+    }
+
+    std::size_t offset = 0;
+    if(!protocol::readUint64(data, length, offset, event.orderId)){
+        return false;
+    }
+    if(event.orderId==0){
+        return false;
+    }
+    return true;
+}

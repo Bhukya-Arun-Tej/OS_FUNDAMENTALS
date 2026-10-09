@@ -14,7 +14,7 @@ market_data_server: market_data_server.cpp feed_producer.cpp udp_publisher.cpp t
 test: protocol.cpp protocol.hpp protocol_test.cpp feed_history.cpp feed_history.hpp feed_history_test.cpp packet_sequencer.cpp packet_sequencer.hpp packet_sequencer_test.cpp
 	$(CXX) $(CXXFLAGS) protocol.cpp protocol_test.cpp -o protocol_test
 	$(CXX) $(CXXFLAGS) feed_history.cpp feed_history_test.cpp -o feed_history_test
-	$(CXX) $(CXXFLAGS) packet_sequencer.cpp packet_sequencer_test.cpp -o packet_sequencer_test
+	$(CXX) $(CXXFLAGS) protocol.cpp packet_sequencer.cpp packet_sequencer_test.cpp -o packet_sequencer_test
 	./protocol_test
 	./feed_history_test
 	./packet_sequencer_test

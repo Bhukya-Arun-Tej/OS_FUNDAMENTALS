@@ -3,7 +3,6 @@
 #include "protocol.hpp"
 #include "feed_history.hpp"
 #include <vector>
-#include <string>
 #include <iostream>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -17,9 +16,10 @@ int runFeedProducer(FeedHistory& history){
         }
 
     for(std::uint32_t sequence =1; sequence<=10;sequence++){
-        std::vector<std::uint8_t> bytes = {'T','e','s','t',' ','M','e','s','s','a','g','e'};
-        bytes.push_back(static_cast<std::uint8_t>(sequence));
-        FeedPacket packet{sequence, MessageType::Test, bytes};
+        std::vector<std::uint8_t> addOrderEvent = encodeAddOrderPayload(AddOrderEvent{
+            sequence, FeedSide::Buy, 100 + sequence,sequence
+        });
+        FeedPacket packet{sequence, MessageType::AddOrder, addOrderEvent};
         const std::vector<std::uint8_t> encodedBytes = encodePacket(packet);
 
         if(encodedBytes.empty() || encodedBytes.size()<PacketHeaderSize){

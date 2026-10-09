@@ -9,6 +9,7 @@ inline constexpr std::uint16_t FeedVersion = 1;
 inline constexpr std::size_t PacketHeaderSize = 14;
 inline constexpr std::uint32_t MaxPacketLength = 1024;
 inline constexpr std::size_t AddOrderPayloadSize = 25;
+inline constexpr std::size_t CancelOrderPayloadSize = 8;
 using PayloadLength = std::uint16_t;
 
 enum class MessageType: std::uint16_t{
@@ -45,4 +46,6 @@ std::vector<std::uint8_t> encodePacket(const FeedPacket& packet);
 bool decodePacket(const std::uint8_t* data, std::size_t length, FeedPacket &packet);
 std::vector<std::uint8_t> encodeAddOrderPayload( const AddOrderEvent& event);
 bool decodeAddOrderPayload(const std::vector<std::uint8_t>& payload,AddOrderEvent& event);
+std::vector<std::uint8_t> encodeCancelOrderPayload( const CancelOrderEvent& event);
+bool decodeCancelOrderPayload(const std::vector<std::uint8_t>& payload,CancelOrderEvent& event);
 

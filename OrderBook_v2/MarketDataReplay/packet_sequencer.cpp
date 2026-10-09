@@ -13,7 +13,10 @@ void drainPendingPackets(std::vector<PendingPacketSlot>& packetBuffer,std::uint3
             return;
         }  
         std::cout<<"Received sequence: "<<expected<<"\n";
-
+        // std::cout<<"Received event type: "<<static_cast<uint16_t> (slot.packet.messageType)<<"\n";
+        // AddOrderEvent event;
+        // decodeAddOrderPayload(slot.packet.payload,event);
+        // std::cout<<"orderId: "<<event.orderId<<" price: "<<event.price<<" quantity: "<<event.quantity<<"\n";
         slot.valid = false;
         expected++;
       }

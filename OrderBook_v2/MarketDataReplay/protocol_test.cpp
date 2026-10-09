@@ -114,6 +114,34 @@ public:
             allPassed = false;
         }
 
+        if (encodeCancelOrderPayloadWritesExpectedBytes()) {
+            std::cout << "PASS: encodeCancelOrderPayloadWritesExpectedBytes\n";
+        } else {
+            std::cout << "FAIL: encodeCancelOrderPayloadWritesExpectedBytes\n";
+            allPassed = false;
+        }
+
+        if (decodeCancelOrderPayloadReadsExpectedBytes()) {
+            std::cout << "PASS: decodeCancelOrderPayloadReadsExpectedBytes\n";
+        } else {
+            std::cout << "FAIL: decodeCancelOrderPayloadReadsExpectedBytes\n";
+            allPassed = false;
+        }
+
+        if (decodeCancelOrderPayloadRejectsWrongLength()) {
+            std::cout << "PASS: decodeCancelOrderPayloadRejectsWrongLength\n";
+        } else {
+            std::cout << "FAIL: decodeCancelOrderPayloadRejectsWrongLength\n";
+            allPassed = false;
+        }
+
+        if (decodeCancelOrderPayloadRejectsZeroOrderId()) {
+            std::cout << "PASS: decodeCancelOrderPayloadRejectsZeroOrderId\n";
+        } else {
+            std::cout << "FAIL: decodeCancelOrderPayloadRejectsZeroOrderId\n";
+            allPassed = false;
+        }
+
         return allPassed ? 0 : 1;
     }
 
@@ -351,6 +379,50 @@ private:
         AddOrderEvent event;
         const bool decoded = decodeAddOrderPayload(payload, event);
         assert(!decoded && "AddOrder payload with invalid side should be rejected");
+        return true;
+    }
+
+    bool encodeCancelOrderPayloadWritesExpectedBytes() {
+        CancelOrderEvent event{0x0102030405060708ULL};
+
+        const std::vector<std::uint8_t> expected{
+            0x01, 0x02, 0x03, 0x04,
+            0x05, 0x06, 0x07, 0x08
+        };
+
+        const std::vector<std::uint8_t> encoded = encodeCancelOrderPayload(event);
+        assert(encoded == expected && "CancelOrder payload bytes should match the wire layout");
+        return true;
+    }
+
+    bool decodeCancelOrderPayloadReadsExpectedBytes() {
+        const std::vector<std::uint8_t> payload{
+            0x01, 0x02, 0x03, 0x04,
+            0x05, 0x06, 0x07, 0x08
+        };
+
+        CancelOrderEvent event;
+        const bool decoded = decodeCancelOrderPayload(payload, event);
+        assert(decoded && "valid CancelOrder payload should decode");
+        assert(event.orderId == 0x0102030405060708ULL && "order ID should match");
+        return true;
+    }
+
+    bool decodeCancelOrderPayloadRejectsWrongLength() {
+        const std::vector<std::uint8_t> payload(CancelOrderPayloadSize - 1, 0);
+
+        CancelOrderEvent event;
+        const bool decoded = decodeCancelOrderPayload(payload, event);
+        assert(!decoded && "CancelOrder payload with wrong length should be rejected");
+        return true;
+    }
+
+    bool decodeCancelOrderPayloadRejectsZeroOrderId() {
+        const std::vector<std::uint8_t> payload(CancelOrderPayloadSize, 0);
+
+        CancelOrderEvent event;
+        const bool decoded = decodeCancelOrderPayload(payload, event);
+        assert(!decoded && "CancelOrder payload with zero order ID should be rejected");
         return true;
     }
 };
