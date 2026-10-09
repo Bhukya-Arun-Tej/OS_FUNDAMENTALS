@@ -19,6 +19,7 @@ private:
     BuyMap m_buyMap;
     SellMap m_sellMap;
     std::unordered_map<OrderId, OrderLocation> m_orderIndexMap;
+    bool addRestingOrder(OrderId orderId,Side side,Price price,Quantity quantity, Quantity remainingQuantity);
 
 public:
 
@@ -28,6 +29,7 @@ public:
     void printSell();
     bool canMatch(Order &order);
     Trades addOrder(OrderId orderid, Side side, Price price, Quantity quantity);
+    bool addRestingOrder(OrderId orderId,Side side,Price price,Quantity quantity);
     void cancelOrder(OrderId orderid);
     void modifyOrder(OrderId orderId, Price newPrice, Quantity newQuantity);
     Trades matchOrder(Order &order);

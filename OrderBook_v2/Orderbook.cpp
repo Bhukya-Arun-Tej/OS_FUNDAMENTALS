@@ -6,103 +6,6 @@
 #include <list>
 #include <map>
 
-Order::Order
-    (
-            OrderId orderId,
-    Side side,
-            Price price,
-    Quantity quantity
-    ):
-    m_orderId(orderId),
-    m_side(side),
-    m_price(price),
-    m_quantity(quantity),
-    m_remainingQuantity(quantity){}
-
-Order:: Order
-    (
-        OrderId orderId,
-        Side side,
-        Price price,
-        Quantity quantity,
-        Quantity remainingQuantity
-    ):
-    m_orderId(orderId),
-    m_side(side),
-    m_price(price),
-    m_quantity(quantity),
-    m_remainingQuantity(remainingQuantity){}
-
-Price Order::getPrice() const{
-    return m_price;
-}
-
-OrderId Order::getOrderId() const{
-    return m_orderId;
-}
-
-Quantity Order::getQuantity() const {
-    return m_quantity;
-}
-
-Side Order::getSide() const{
-    return m_side;
-}
-
-Quantity Order::getRemainingQuantity() const{
-    return m_remainingQuantity;
-}
-
-void Order::setQuantity(Quantity newQuantity){
-m_quantity = newQuantity;
-}
-
-void Order::setRemainingQuantity(Quantity newQuantity){
-m_remainingQuantity=newQuantity;
-}
-
-
-OrderLocation::OrderLocation(Price price, Side side, OrderPointer pointer):
-m_price{price}, m_side{side}, m_pointer{pointer}{}
-
-OrderPointer OrderLocation::getOrderPointer() const{
-    return m_pointer;
-}
-
-Price OrderLocation::getPrice() const{
-    return m_price;
-}
-
-Side OrderLocation::getSide() const{
-    return m_side;
-}
-
-//TradeInfo::TradeInfo() = default;
-TradeInfo::TradeInfo(OrderId orderId, Price price, Quantity quantity):
-    m_orderId{orderId}, m_price{price}, m_quantity{quantity}{}
-
-OrderId TradeInfo::getOrderId() const{
-    return m_orderId;
-}
-Price TradeInfo::getPrice() const{
-    return m_price;
-}
-Quantity TradeInfo::getQuantity() const{
-    return m_quantity;
-}
-
-
-
-Trade::Trade(TradeInfo buyTradeInfo, TradeInfo sellTradeInfo):
-        m_buyTradeInfo{buyTradeInfo}, m_sellTradeInfo{sellTradeInfo}{}
-
-TradeInfo Trade::getBuyTradeInfo() const{
-    return m_buyTradeInfo;
-}
-
-TradeInfo Trade::getSellTradeInfo() const{
-    return m_sellTradeInfo;
-}
 
 const BuyMap& Orderbook::getBuyMap() const{
     return m_buyMap;
@@ -150,18 +53,13 @@ bool Orderbook::canMatch(Order &order){
     return false;
 }
 
+bool Orderbook::addRestingOrder(OrderId orderid, Side side, Price price, Quantity quantity){
+    return addRestingOrder(orderid,side,price,quantity,quantity);
+}
 
-Trades Orderbook::addOrder(OrderId orderid, Side side, Price price, Quantity quantity){
-    if(m_orderIndexMap.find(orderid) != m_orderIndexMap.end()){
-        return {};
-    }
-    Trades trades{};
-    Order order{orderid,side,price,quantity};
-    if(canMatch(order)){
-        trades = matchOrder(order);
-    }
-    if(order.getRemainingQuantity()==0){
-        return trades;
+bool Orderbook::addRestingOrder(OrderId orderid, Side side, Price price, Quantity quantity, Quantity remainingQuantity){
+    if(m_orderIndexMap.contains(orderid)){
+        return false;
     }
 
     if(side==Side::BUY){
@@ -172,7 +70,7 @@ Trades Orderbook::addOrder(OrderId orderid, Side side, Price price, Quantity qua
                 side,
                 price,
                 quantity,
-                order.getRemainingQuantity()
+                remainingQuantity
         );
         m_orderIndexMap.emplace(orderid, OrderLocation{price,side,it});
     }
@@ -184,11 +82,27 @@ Trades Orderbook::addOrder(OrderId orderid, Side side, Price price, Quantity qua
                 side,
                 price,
                 quantity,
-                order.getRemainingQuantity()
+                remainingQuantity
         );
         m_orderIndexMap.emplace(orderid, OrderLocation{price,side,it});
     }
+    return true;
+}
 
+Trades Orderbook::addOrder(OrderId orderid, Side side, Price price, Quantity quantity){
+    if(m_orderIndexMap.contains(orderid)){
+        return {};
+    }
+    Trades trades{};
+    Order order{orderid,side,price,quantity};
+    if(canMatch(order)){
+        trades = matchOrder(order);
+    }
+    if(order.getRemainingQuantity()==0){
+        return trades;
+    }
+
+    addRestingOrder(orderid,side,price,quantity,order.getRemainingQuantity());
     return trades;
 }
 

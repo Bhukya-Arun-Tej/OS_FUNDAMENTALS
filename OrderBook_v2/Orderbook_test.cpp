@@ -87,6 +87,24 @@ class OrderbookTest{
                 std::cout<<"FAIL: modifyReplacesOrderAtNewPriceAndQuantity\n";
                 allPassed = false;
             }
+
+            if(addRestingOrderDoesNotMatch()){
+                std::cout<<"PASS: addRestingOrderDoesNotMatch\n";
+            }
+            else{
+                std::cout<<"FAIL: addRestingOrderDoesNotMatch\n";
+                allPassed = false;
+            }
+
+            if(addRestingOrderDuplicateFails()){
+                std::cout<<"PASS: addRestingOrderDuplicateFails\n";
+            }
+            else{
+                std::cout<<"FAIL: addRestingOrderDuplicateFails\n";
+                allPassed = false;
+            }
+
+            
             return allPassed?0 : 1;
         }
     
@@ -137,6 +155,7 @@ class OrderbookTest{
             assert(book.getSellMap().empty() && "fully filled sell should be removed");
             assert(book.getBuyMap().size()==1 && "buy remainder should rest at one price level");
             assert(book.getBuyMap().begin()->second.front().getOrderId()==2 && "resting buy order ID should be 2");
+            assert(book.getBuyMap().begin()->second.front().getQuantity() == 10 && "resting buy should preserve its original quantity");
             assert(book.getBuyMap().begin()->second.front().getRemainingQuantity()==5 && "buy remainder should be 5");
             return true;
         }
@@ -219,6 +238,24 @@ class OrderbookTest{
             assert(book.getBuyMap().begin()->second.front().getOrderId()==1 && "modified order ID should remain 1");
             assert(book.getBuyMap().begin()->second.front().getQuantity()==4 && "modified order quantity should be 4");
             assert(book.getBuyMap().begin()->second.front().getRemainingQuantity()==4 && "modified order remaining quantity should be 4");
+            return true;
+        }
+
+        bool addRestingOrderDoesNotMatch(){
+            Orderbook book;
+            book.addOrder(1,Side::SELL,100,10);
+            const bool added = book.addRestingOrder(2,Side::BUY,191,5);
+            assert(added && "resting order should succeed");
+            assert(book.getBuyMap().size()==1 && "buy map should have only one entry") ;
+            assert(book.getSellMap().size()==1 && "sell map should have only one entry") ;
+            return true;
+        }
+
+        bool addRestingOrderDuplicateFails(){
+            Orderbook book;
+            book.addOrder(1,Side::SELL,100,10);
+            const bool added = book.addRestingOrder(1,Side::BUY,191,5);
+            assert(!added && "resting order should fail");
             return true;
         }
 
