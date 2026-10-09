@@ -50,7 +50,8 @@ public:
 
 private:
     PendingPacketSlot makeValidSlot(std::uint32_t sequenceNumber) {
-        FeedPacket packet{sequenceNumber, MessageType::Test, "test"};
+        std::vector<std::uint8_t> bytes = {'t','e','s','t'};
+        FeedPacket packet{sequenceNumber, MessageType::Test, bytes};
         return PendingPacketSlot{sequenceNumber, true, packet};
     }
 

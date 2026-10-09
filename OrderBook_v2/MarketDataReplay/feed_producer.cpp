@@ -17,7 +17,9 @@ int runFeedProducer(FeedHistory& history){
         }
 
     for(std::uint32_t sequence =1; sequence<=10;sequence++){
-        FeedPacket packet{sequence, MessageType::Test, "Test Message "+std::to_string(sequence)};
+        std::vector<std::uint8_t> bytes = {'T','e','s','t',' ','M','e','s','s','a','g','e'};
+        bytes.push_back(static_cast<std::uint8_t>(sequence));
+        FeedPacket packet{sequence, MessageType::Test, bytes};
         const std::vector<std::uint8_t> encodedBytes = encodePacket(packet);
 
         if(encodedBytes.empty() || encodedBytes.size()<PacketHeaderSize){

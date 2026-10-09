@@ -1,6 +1,5 @@
 #pragma once
 
-#include <string>
 #include <vector>
 #include <cstdint>
 #include <cstddef>
@@ -12,13 +11,32 @@ inline constexpr std::uint32_t MaxPacketLength = 1024;
 using PayloadLength = std::uint16_t;
 
 enum class MessageType: std::uint16_t{
-    Test = 1
+    Test = 1,
+    AddOrder= 2,
+    CancelOrder =3,
 };
 
 struct FeedPacket{
     std::uint32_t sequenceNumber{};
     MessageType messageType{};
-    std::string payload{};
+    std::vector<std::uint8_t> payload{};
+};
+
+
+enum class FeedSide : std::uint8_t {
+    Buy = 1,
+    Sell = 2
+};
+
+struct AddOrderEvent {
+    std::uint64_t orderId{};
+    FeedSide side{};
+    std::uint64_t price{};
+    std::uint64_t quantity{};
+};
+
+struct CancelOrderEvent {
+    std::uint64_t orderId{};
 };
 
 std::vector<std::uint8_t> encodePacket(const FeedPacket& packet);

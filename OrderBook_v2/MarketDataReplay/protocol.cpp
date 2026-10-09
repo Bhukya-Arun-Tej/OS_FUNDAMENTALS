@@ -54,7 +54,7 @@ std::vector<std::uint8_t> encodePacket(const FeedPacket& packet){
     if (packet.sequenceNumber == 0 || packet.payload.size()>MaxPacketLength-PacketHeaderSize) {
         return {};
     }
-    if (packet.messageType != MessageType::Test) {
+    if (packet.messageType != MessageType::Test && packet.messageType != MessageType::AddOrder && packet.messageType != MessageType::CancelOrder ) {
         return {};
     }
     std::vector<std::uint8_t> buffer{};
@@ -95,12 +95,18 @@ bool decodePacket(const std::uint8_t* data, std::size_t length, FeedPacket &pack
     if(!protocol::readUint16(data,length,offset,messageType)){
         return false;
     }
-    if (messageType != static_cast<std::uint16_t>(MessageType::Test)) {
+
+    if (messageType != static_cast<std::uint16_t>(MessageType::Test) &&
+        messageType != static_cast<std::uint16_t>(MessageType::AddOrder) &&
+        messageType != static_cast<std::uint16_t>(MessageType::CancelOrder)) {
         return false;
     }
 
     std::uint32_t sequenceNumber{};
     if(!protocol::readUint32(data, length, offset, sequenceNumber)){
+        return false;
+    }
+    if(sequenceNumber==0){
         return false;
     }
 
@@ -115,7 +121,7 @@ bool decodePacket(const std::uint8_t* data, std::size_t length, FeedPacket &pack
 
     packet.messageType = static_cast<MessageType>(messageType);
     packet.sequenceNumber = sequenceNumber;
-    packet.payload.assign(reinterpret_cast<const char*>(data+offset), payloadSize);
+    packet.payload.assign(data+offset, data+offset+payloadSize);
 
     return true;
 }
