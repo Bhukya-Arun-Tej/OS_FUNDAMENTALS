@@ -4,6 +4,14 @@
 #include <limits>
 
 namespace protocol{
+    void pushUint64(std::vector<std::uint8_t> &buffer, std::uint64_t value){
+        const std::uint64_t newValue = htonll(value);
+        const std::size_t oldSize = buffer.size();
+        buffer.resize(oldSize + sizeof(newValue));
+
+        std::memcpy(&buffer[oldSize],&newValue,sizeof(newValue));
+    }
+
     void pushUint32(std::vector<std::uint8_t> &buffer, std::uint32_t value){
         const std::uint32_t newValue = htonl(value);
         const std::size_t oldSize = buffer.size();
@@ -18,6 +26,18 @@ namespace protocol{
         buffer.resize(oldSize + sizeof(newValue));
 
         std::memcpy(&buffer[oldSize],&newValue,sizeof(newValue));
+    }
+
+    bool readUint64(const std::uint8_t* data, std::size_t length, std::size_t &offset, std::uint64_t& value){
+        if(offset>length || length-offset < sizeof(std::uint64_t)){
+            return false;
+        }
+
+        std::uint64_t networkValue{};
+        std::memcpy(&networkValue, data+offset, sizeof(networkValue));
+        value = ntohll(networkValue);
+        offset+= sizeof(networkValue);
+        return true;
     }
 
     bool readUint32(const std::uint8_t* data, std::size_t length, std::size_t &offset, std::uint32_t& value){
@@ -125,3 +145,67 @@ bool decodePacket(const std::uint8_t* data, std::size_t length, FeedPacket &pack
 
     return true;
 }
+
+std::vector<std::uint8_t> encodeAddOrderPayload( const AddOrderEvent& event){
+
+    if(event.orderId==0 || event.price==0 || event.quantity==0){
+        return {};
+    }
+    if(event.side!= FeedSide::Buy && event.side!=FeedSide::Sell){
+        return {};
+    }
+    
+    std::vector<std::uint8_t> buffer{};
+    buffer.reserve(AddOrderPayloadSize);
+
+    protocol::pushUint64(buffer,event.orderId);
+    buffer.push_back(static_cast<std::uint8_t>(event.side));
+    protocol::pushUint64(buffer, event.price);
+    protocol::pushUint64(buffer, event.quantity);
+    return buffer;
+}
+
+bool decodeAddOrderPayload(const std::vector<std::uint8_t>& payload,AddOrderEvent& event){
+    std::size_t length = AddOrderPayloadSize;
+    if(payload.size()!=length){
+        return false;
+    }
+    const std::uint8_t *data = payload.data();
+
+    if(data == nullptr){
+        return false;
+    }
+
+    std::size_t offset = 0;
+    if(!protocol::readUint64(data, length, offset, event.orderId)){
+        return false;
+    }
+    if(event.orderId==0){
+        return false;
+    }
+
+    const std::uint8_t side = data[offset];
+    offset++;
+    if(side!= static_cast<std::uint8_t>(FeedSide::Buy) && side!= static_cast<std::uint8_t>(FeedSide::Sell)){
+        return false;
+    }
+
+    event.side = static_cast<FeedSide> (side);
+    
+    if(!protocol::readUint64(data,length,offset,event.price)){
+        return false;
+    }
+    if(event.price==0){
+        return false;
+    }
+
+    if(!protocol::readUint64(data, length, offset, event.quantity)){
+        return false;
+    }
+    if(event.quantity==0){
+        return false;
+    }
+
+    return true;
+}
+
