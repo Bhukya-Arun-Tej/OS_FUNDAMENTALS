@@ -5,8 +5,8 @@ all: udp_receiver  market_data_server
 
 .PHONY: all test clean
 
-udp_receiver: udp_receiver.cpp protocol.cpp protocol.hpp tcp_recovery_client.hpp tcp_recovery_client.cpp tcphelper.cpp tcphelper.hpp packet_sequencer.cpp market_data_applier.cpp ../Orderbook.cpp ../Order.cpp ../OrderLocation.cpp ../Trade.cpp ../TradeInfo.cpp
-	$(CXX) $(CXXFLAGS) udp_receiver.cpp protocol.cpp tcp_recovery_client.cpp tcphelper.cpp packet_sequencer.cpp market_data_applier.cpp ../Orderbook.cpp ../Order.cpp ../OrderLocation.cpp ../Trade.cpp ../TradeInfo.cpp -o udp_receiver
+udp_receiver: udp_receiver.cpp protocol.cpp protocol.hpp tcp_recovery_client.hpp tcp_recovery_client.cpp tcphelper.cpp tcphelper.hpp packet_sequencer.cpp market_data_applier.cpp  market_data_receiver.cpp market_data_receiver.hpp ../Orderbook.cpp ../Order.cpp ../OrderLocation.cpp ../Trade.cpp ../TradeInfo.cpp 
+	$(CXX) $(CXXFLAGS) udp_receiver.cpp protocol.cpp tcp_recovery_client.cpp tcphelper.cpp packet_sequencer.cpp market_data_applier.cpp market_data_receiver.cpp ../Orderbook.cpp ../Order.cpp ../OrderLocation.cpp ../Trade.cpp ../TradeInfo.cpp -o udp_receiver
 
 market_data_server: market_data_server.cpp feed_producer.cpp udp_publisher.cpp tcp_recovery_server.cpp feed_history.cpp protocol.cpp tcphelper.cpp
 	$(CXX) $(CXXFLAGS) market_data_server.cpp feed_producer.cpp udp_publisher.cpp tcp_recovery_server.cpp feed_history.cpp protocol.cpp tcphelper.cpp -o market_data_server
@@ -22,4 +22,4 @@ test: protocol.cpp protocol.hpp protocol_test.cpp feed_history.cpp feed_history.
 	./market_data_applier_test
 
 clean: 
-	rm -f udp_receiver protocol_test feed_history_test packet_sequencer_test market_data_applier_test market_data_server
+	rm -f udp_receiver protocol_test tcp_recovery_server udp_publisher feed_history_test packet_sequencer_test market_data_applier_test market_data_server

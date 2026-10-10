@@ -8,6 +8,7 @@
 #include "packet_sequencer.hpp"
 #include "market_data_applier.hpp"
 #include "../Orderbook.hpp"
+#include "market_data_receiver.hpp"
 
 constexpr std::uint16_t Port = 5000;
 
@@ -29,14 +30,11 @@ int main(){
         return 1;
     }
 
-
-    std::uint32_t expected = 1;
-    std::vector<PendingPacketSlot> packetBuffer(BUFFERSIZE);
-
     Orderbook book;
     MarketDataApplier applier(book);
+    MarketDataReceiver receiver(applier);
 
-    while(expected<=10){
+    while(receiver.expectedSequence()<=10){
 
         std::uint8_t buffer[MaxPacketLength]{};
         sockaddr_in senderAddress{};
@@ -64,54 +62,40 @@ int main(){
             continue;
         }
         std::uint32_t received = receivedPacket.sequenceNumber;
-        if(received == 0) {
-            std::cerr<<"Invalid sequence number\n";
+        if (!receiver.bufferPacket(receivedPacket)) {
+            std::cerr << "Packet was duplicate, invalid, or outside the buffer window\n";
             continue;
         }
-        if(received<expected){
-            std::cout<<"Duplicate sequence detected. Discarding it\n";
-            continue;
-        }
-        if(received - expected >= BUFFERSIZE) {
-            std::cerr<<"Packet exceeds pending-buffer window; resync needed\n";
+         if (!receiver.drainPackets()) {
+            std::cerr << "Could not apply recovered packet\n";
             close(socketFd);
             return 1;
         }
-        std::size_t bufferIndex = (received-1) & (BUFFERSIZE-1);
-        packetBuffer[bufferIndex] = PendingPacketSlot{received,true,receivedPacket};
+       
 
-
-        if(!drainPendingPackets(packetBuffer,expected,applier)){
-                std::cout<<"Error processing the packets\n";
-                close(socketFd);
-                return 1;
-            }
-
-        if(expected<received){
-            std::cout<<"Missing sequences from: "<<expected<<" to "<<received-1<<"\n";
+        if(receiver.expectedSequence()<received){
+            std::cout<<"Missing sequences from: "<<receiver.expectedSequence()<<" to "<<received-1<<"\n";
             std::cout<<"Fetching missing packets from TCP server\n";
             std::vector<FeedPacket> recoveredPackets;
-            if(!recoverMissingPackets(expected,received-1,recoveredPackets)){
+            if(!recoverMissingPackets(receiver.expectedSequence(),received-1,recoveredPackets)){
                 std::cerr<<"Could not receive missing packets\n";
                 close(socketFd);
                 return 1;
             }
 
             for(const auto& packet:recoveredPackets){
-                const std::size_t bufferIndex = (packet.sequenceNumber-1) & (BUFFERSIZE-1);
-                packetBuffer[bufferIndex] = PendingPacketSlot{packet.sequenceNumber,true,packet};
+                receiver.bufferPacket(packet);
             }
             std::cout<<"Recovered Packets start\n";
-            if(!drainPendingPackets(packetBuffer,expected,applier)){
-                std::cout<<"Error processing the packets\n";
-                close(socketFd);
-                return 1;
-            }
+            receiver.drainPackets();
             std::cout<<"Recovered Packets end:\n";
         }
         
     }
 
+    book.printBuy();
+    std::cout<<"\n";
+    book.printSell();
     close(socketFd);
     return 0;
 

@@ -17,7 +17,7 @@ int runFeedProducer(FeedHistory& history){
 
     for(std::uint32_t sequence =1; sequence<=10;sequence++){
         std::vector<std::uint8_t> addOrderEvent = encodeAddOrderPayload(AddOrderEvent{
-            sequence, FeedSide::Buy, 100 + sequence,sequence
+            sequence, (sequence&1)?FeedSide::Buy  : FeedSide::Sell , 100 + ((sequence&1)? sequence : (-sequence)),sequence
         });
         FeedPacket packet{sequence, MessageType::AddOrder, addOrderEvent};
         const std::vector<std::uint8_t> encodedBytes = encodePacket(packet);
