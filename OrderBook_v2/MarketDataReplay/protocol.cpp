@@ -5,11 +5,13 @@
 
 namespace protocol{
     void pushUint64(std::vector<std::uint8_t> &buffer, std::uint64_t value){
-        const std::uint64_t newValue = htonll(value);
+        const std::uint32_t high = htonl(static_cast<std::uint32_t>(value>>32));
+        const std::uint32_t low = htonl(static_cast<std::uint32_t>(value & 0xFFFFFFFF));
         const std::size_t oldSize = buffer.size();
-        buffer.resize(oldSize + sizeof(newValue));
+        buffer.resize(oldSize + sizeof(value));
 
-        std::memcpy(&buffer[oldSize],&newValue,sizeof(newValue));
+        std::memcpy(&buffer[oldSize],&high,sizeof(high));
+        std::memcpy(&buffer[oldSize+sizeof(high)],&low,sizeof(low));
     }
 
     void pushUint32(std::vector<std::uint8_t> &buffer, std::uint32_t value){
@@ -33,10 +35,13 @@ namespace protocol{
             return false;
         }
 
-        std::uint64_t networkValue{};
-        std::memcpy(&networkValue, data+offset, sizeof(networkValue));
-        value = ntohll(networkValue);
-        offset+= sizeof(networkValue);
+        std::uint32_t high{},low{};
+        std::memcpy(&high, data+offset, sizeof(high));
+        std::memcpy(&low, data+offset+4, sizeof(low));
+        high = ntohl(high);
+        low = ntohl(low);
+        value = (static_cast<std::uint64_t>(high)<<32) | (static_cast<std::uint64_t>(low));
+        offset+= sizeof(value);
         return true;
     }
 
