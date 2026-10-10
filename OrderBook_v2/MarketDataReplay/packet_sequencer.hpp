@@ -3,6 +3,7 @@
 #include "protocol.hpp"
 #include <vector>
 #include <cstdint>
+#include "market_data_applier.hpp"
 
 
 struct PendingPacketSlot {
@@ -14,4 +15,4 @@ struct PendingPacketSlot {
 inline constexpr std::uint32_t BUFFERSIZE = (1<<20);
 
 
-void drainPendingPackets(std::vector<PendingPacketSlot>& packetBuffer,std::uint32_t& expected);
+bool drainPendingPackets(std::vector<PendingPacketSlot>& packetBuffer,std::uint32_t& expected, MarketDataApplier& applier);

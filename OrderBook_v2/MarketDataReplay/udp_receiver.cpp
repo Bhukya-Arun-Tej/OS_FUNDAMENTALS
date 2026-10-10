@@ -6,6 +6,8 @@
 #include "protocol.hpp"
 #include "tcp_recovery_client.hpp"
 #include "packet_sequencer.hpp"
+#include "market_data_applier.hpp"
+#include "../Orderbook.hpp"
 
 constexpr std::uint16_t Port = 5000;
 
@@ -30,6 +32,9 @@ int main(){
 
     std::uint32_t expected = 1;
     std::vector<PendingPacketSlot> packetBuffer(BUFFERSIZE);
+
+    Orderbook book;
+    MarketDataApplier applier(book);
 
     while(expected<=10){
 
@@ -76,7 +81,11 @@ int main(){
         packetBuffer[bufferIndex] = PendingPacketSlot{received,true,receivedPacket};
 
 
-        drainPendingPackets(packetBuffer,expected);
+        if(!drainPendingPackets(packetBuffer,expected,applier)){
+                std::cout<<"Error processing the packets\n";
+                close(socketFd);
+                return 1;
+            }
 
         if(expected<received){
             std::cout<<"Missing sequences from: "<<expected<<" to "<<received-1<<"\n";
@@ -93,7 +102,11 @@ int main(){
                 packetBuffer[bufferIndex] = PendingPacketSlot{packet.sequenceNumber,true,packet};
             }
             std::cout<<"Recovered Packets start\n";
-            drainPendingPackets(packetBuffer,expected);
+            if(!drainPendingPackets(packetBuffer,expected,applier)){
+                std::cout<<"Error processing the packets\n";
+                close(socketFd);
+                return 1;
+            }
             std::cout<<"Recovered Packets end:\n";
         }
         
