@@ -58,32 +58,25 @@ public:
             allPassed = false;
         }
 
+        if (recoversGapAndDrainsBufferedPackets()) {
+            std::cout << "PASS: recoversGapAndDrainsBufferedPackets\n";
+        } else {
+            std::cout << "FAIL: recoversGapAndDrainsBufferedPackets\n";
+            allPassed = false;
+        }
+
         return allPassed ? 0 : 1;
     }
 
 private:
-    FeedPacket makeAddOrderPacket(
-        std::uint32_t sequenceNumber,
-        OrderId orderId,
-        FeedSide side = FeedSide::Buy,
-        Price price = 100,
-        Quantity quantity = 10
-    ) {
+    FeedPacket makeAddOrderPacket(std::uint32_t sequenceNumber,OrderId orderId,FeedSide side = FeedSide::Buy,Price price = 100,Quantity quantity = 10) {
         const AddOrderEvent event{orderId, side, price, quantity};
-        return FeedPacket{
-            sequenceNumber,
-            MessageType::AddOrder,
-            encodeAddOrderPayload(event)
-        };
+        return FeedPacket{sequenceNumber,MessageType::AddOrder,encodeAddOrderPayload(event)};
     }
 
     FeedPacket makeCancelOrderPacket(std::uint32_t sequenceNumber, OrderId orderId) {
         const CancelOrderEvent event{orderId};
-        return FeedPacket{
-            sequenceNumber,
-            MessageType::CancelOrder,
-            encodeCancelOrderPayload(event)
-        };
+        return FeedPacket{sequenceNumber,MessageType::CancelOrder,encodeCancelOrderPayload(event)};
     }
 
     bool emptyReceiverDoesNotAdvanceSequence() {
@@ -170,6 +163,36 @@ private:
         assert(receiver.expectedSequence() == 1 && "failed event must not advance expected");
         assert(book.getBuyMap().empty() && "failed event must not update book");
         assert(book.getSellMap().empty() && "failed event must not update book");
+        return true;
+    }
+
+    bool recoversGapAndDrainsBufferedPackets() {
+        Orderbook book;
+        MarketDataApplier applier(book);
+        MarketDataReceiver receiver(applier);
+
+        for (std::uint32_t sequenceNumber = 1; sequenceNumber <= 4; ++sequenceNumber) {
+            assert(receiver.bufferPacket(makeAddOrderPacket(sequenceNumber,sequenceNumber,FeedSide::Buy,100 + sequenceNumber,sequenceNumber)));
+            assert(receiver.drainPackets());
+        }
+        assert(receiver.expectedSequence() == 5 && "sequences 1 through 4 must apply");
+        assert(receiver.bufferPacket(makeAddOrderPacket(7, 7, FeedSide::Buy, 107, 7)));
+        assert(receiver.drainPackets());
+        assert(receiver.expectedSequence() == 5 && "sequence 7 must remain buffered while 5 is missing");
+        assert(receiver.bufferPacket(makeAddOrderPacket(5, 5, FeedSide::Buy, 105, 5)));
+        assert(receiver.bufferPacket(makeAddOrderPacket(6, 6, FeedSide::Buy, 106, 6)));
+        assert(receiver.drainPackets());
+        assert(receiver.expectedSequence() == 8 && "recovery must drain 5, 6, and buffered 7");
+
+        for (std::uint32_t sequenceNumber = 8; sequenceNumber <= 10; ++sequenceNumber) {
+            assert(receiver.bufferPacket(makeAddOrderPacket(sequenceNumber,sequenceNumber,FeedSide::Buy,100 + sequenceNumber,sequenceNumber)));
+            assert(receiver.drainPackets());
+        }
+
+        assert(receiver.expectedSequence() == 11 && "all ten events must apply in sequence");
+        assert(book.getBuyMap().size() == 10 && "all ten orders must exist in the local book");
+        assert(book.getBuyMap().begin()->first == 110 && "best buy price must be 110");
+        assert(book.getBuyMap().at(105).front().getOrderId() == 5 && "recovered order must apply");
         return true;
     }
 };

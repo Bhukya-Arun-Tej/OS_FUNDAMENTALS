@@ -23,5 +23,9 @@ test: protocol.cpp protocol.hpp protocol_test.cpp feed_history.cpp feed_history.
 	./market_data_applier_test
 	./market_data_receiver_test
 
+bench: protocol.cpp protocol.hpp market_data_applier.cpp  market_data_receiver.cpp market_data_receiver.hpp ../Orderbook.cpp market_data_replay_benchmark.cpp
+	$(CXX) $(CXXFLAGS) -O3 -DNDEBUG -march=native protocol.cpp market_data_applier.cpp  market_data_receiver.cpp packet_sequencer.cpp market_data_replay_benchmark.cpp ../Orderbook.cpp ../Order.cpp ../OrderLocation.cpp ../Trade.cpp ../TradeInfo.cpp -o market_data_replay_benchmark
+	./market_data_replay_benchmark
+
 clean: 
 	rm -f udp_receiver protocol_test tcp_recovery_server udp_publisher feed_history_test packet_sequencer_test market_data_applier_test market_data_receiver_test market_data_server

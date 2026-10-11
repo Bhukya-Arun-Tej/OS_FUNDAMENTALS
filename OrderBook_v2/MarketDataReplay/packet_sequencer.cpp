@@ -13,7 +13,7 @@ bool drainPendingPackets(std::vector<PendingPacketSlot>& packetBuffer,std::uint3
         if(!slot.valid || slot.sequenceNumber!=expected){
             return true;
         }  
-        std::cout<<"Received sequence: "<<expected<<"\n";
+        // std::cout<<"Received sequence: "<<expected<<"\n";
         if(!applier.processPacket(slot.packet)){
           return false;
         }

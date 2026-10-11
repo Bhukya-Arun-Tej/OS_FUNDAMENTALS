@@ -12,6 +12,8 @@
 /OrderBook_v2/MarketDataReplay/market_data_applier_test
 /OrderBook_v2/MarketDataReplay/market_data_receiver_test
 /OrderBook_v2/MarketDataReplay/market_data_server
+/OrderBook_v2/MarketDataReplay/market_data_replay_benchmark
+
 
 # Generated OrderBook executables
 /OrderBook_v2/Orderbook
