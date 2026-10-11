@@ -12,7 +12,7 @@
 
 using Clock = std::chrono::steady_clock;
 constexpr std::size_t SampleCount = 1'000'000;
-
+constexpr std::size_t RecoveryBlockSize = 10;
 std::mt19937_64 generator(42);
 
 void populateAddOnlyReplayPackets(std::vector<std::vector<std::uint8_t>>& replayPackets){
@@ -35,29 +35,52 @@ void populateCancelOnlyReplayPackets(std::vector<std::vector<std::uint8_t>>& rep
         CancelOrderEvent event{sequence};
         const FeedPacket packet {sequence, MessageType::CancelOrder, encodeCancelOrderPayload(event)};
         replayPackets.push_back(encodePacket(packet));
-    }    
+    }
 }
 
-void populateMixReplayPackets(std::vector<std::vector<std::uint8_t>>& replayPackets,MarketDataApplier& applier){
+void populateMixReplayPackets(std::vector<std::vector<std::uint8_t>>& replayPackets){
     replayPackets.reserve(SampleCount);
-
-    for(std::uint32_t sequence=1;sequence<=700'000;sequence++){
-        AddOrderEvent addEvent{sequence, FeedSide::Buy, (100+sequence)%1000 +1,(100+sequence)%1000 +1};
-        const FeedPacket addPacket {sequence, MessageType::AddOrder, encodeAddOrderPayload(addEvent)};
-        replayPackets.push_back(encodePacket(addPacket));
+    std::uniform_int_distribution<int> operationDistribution(0,99);
+    std::uniform_int_distribution<int> sideDistribution(0,1);
+    std::uniform_int_distribution<std::uint64_t> priceDistribution(1,1000);
+    std::uniform_int_distribution<std::uint64_t> quantityDistribution(1,100);
+    std::vector<OrderId> activeOrderIds;
+    activeOrderIds.reserve(SampleCount);
+    OrderId nextOrderId = 1;
+    for(std::uint32_t sequence=1;sequence<=SampleCount;sequence++){
+        const bool shouldAdd = activeOrderIds.empty() || operationDistribution(generator)<70;
+        if(shouldAdd){
+            const OrderId orderId = nextOrderId++;
+            const FeedSide side = sideDistribution(generator)==0 ? FeedSide::Buy : FeedSide::Sell;
+            AddOrderEvent event{orderId,side,priceDistribution(generator),quantityDistribution(generator)};
+            const FeedPacket packet {sequence, MessageType::AddOrder, encodeAddOrderPayload(event)};
+            replayPackets.push_back(encodePacket(packet));
+            activeOrderIds.push_back(orderId);
+        }
+        else{
+            std::uniform_int_distribution<std::size_t> indexDistribution(0,activeOrderIds.size()-1);
+            const std::size_t index = indexDistribution(generator);
+            const OrderId orderId = activeOrderIds[index];
+            activeOrderIds[index] = activeOrderIds.back();
+            activeOrderIds.pop_back();
+            CancelOrderEvent event{orderId};
+            const FeedPacket packet {sequence, MessageType::CancelOrder, encodeCancelOrderPayload(event)};
+            replayPackets.push_back(encodePacket(packet));
+        }
     }
-
-    for(std::uint32_t sequence=700'001;sequence<=SampleCount;sequence++){
-        AddOrderEvent addEvent{sequence, FeedSide::Buy, (100+sequence)%1000 +1,(100+sequence)%1000 +1};
-        const FeedPacket addPacket {sequence, MessageType::AddOrder, encodeAddOrderPayload(addEvent)};
-        applier.processPacket(addPacket);
-        CancelOrderEvent event{sequence};
-        const FeedPacket packet {sequence, MessageType::CancelOrder, encodeCancelOrderPayload(event)};
-        replayPackets.push_back(encodePacket(packet));
-    }
-    
 }
 
+void populateReorderedRecoveryPackets(std::vector<std::vector<std::uint8_t>>& replayPackets){
+    replayPackets.reserve(SampleCount);
+    for(std::uint32_t firstSequence=1;firstSequence<=SampleCount;firstSequence+=RecoveryBlockSize){
+        const std::uint32_t arrivalOrder[RecoveryBlockSize]{firstSequence,firstSequence+1,firstSequence+2,firstSequence+3,firstSequence+6,firstSequence+4,firstSequence+5,firstSequence+7,firstSequence+8,firstSequence+9};
+        for(const std::uint32_t sequence:arrivalOrder){
+            AddOrderEvent event{sequence, FeedSide::Buy, (100+sequence)%1000 +1,(100+sequence)%1000 +1};
+            const FeedPacket packet {sequence, MessageType::AddOrder, encodeAddOrderPayload(event)};
+            replayPackets.push_back(encodePacket(packet));
+        }
+    }
+}
 
 void printLatencyStats(const char* benchmarkName, std::vector<std::int64_t>& latencies, uint64_t totalLatency){
     std::cout<<"Recorded samples: "<<latencies.size()<<"\n";
@@ -114,8 +137,7 @@ void calculateAddOnlyLatency(){
         latencies.push_back(latency);
         totalLatency+=latency;
     }
-    printLatencyStats("client processing", latencies ,totalLatency);
-    std::cout<<"benchmark sink: "<<benchmarkSink<<"\n";
+    printLatencyStats("add-only client processing", latencies ,totalLatency);
 }
 
 void calculateCancelOnlyLatency(){
@@ -146,10 +168,8 @@ void calculateCancelOnlyLatency(){
         latencies.push_back(latency);
         totalLatency+=latency;
     }
-    printLatencyStats("client processing", latencies ,totalLatency);
-    std::cout<<"benchmark sink: "<<benchmarkSink<<"\n";
+    printLatencyStats("cancel-only client processing", latencies ,totalLatency);
 }
-
 
 void calculateMixedLatency(){
     Orderbook book;
@@ -162,7 +182,7 @@ void calculateMixedLatency(){
     latencies.reserve(SampleCount);
     volatile std::size_t benchmarkSink = 0;
     std::vector<std::vector<std::uint8_t>> replayPackets;
-    populateMixReplayPackets(replayPackets, applier);
+    populateMixReplayPackets(replayPackets);
     for (const auto& encodedBytes : replayPackets) {
         FeedPacket packet;
         const auto start = Clock::now();
@@ -179,26 +199,52 @@ void calculateMixedLatency(){
         latencies.push_back(latency);
         totalLatency+=latency;
     }
-    printLatencyStats("client processing", latencies ,totalLatency);
-    std::cout<<"benchmark sink: "<<benchmarkSink<<"\n";
+    printLatencyStats("mixed client processing", latencies ,totalLatency);
 }
 
+void calculateReorderedRecoveryLatency(){
+    Orderbook book;
+    MarketDataApplier applier(book);
+    MarketDataReceiver receiver(applier);
+
+    std::vector<std::int64_t> latencies;
+    uint64_t totalLatency = 0;
+
+    latencies.reserve(SampleCount);
+    volatile std::size_t benchmarkSink = 0;
+    std::vector<std::vector<std::uint8_t>> replayPackets;
+    populateReorderedRecoveryPackets(replayPackets);
+    for (const auto& encodedBytes : replayPackets) {
+        FeedPacket packet;
+        const auto start = Clock::now();
+        const bool decoded = decodePacket(encodedBytes.data(),encodedBytes.size(),packet);
+        const bool buffered = decoded && receiver.bufferPacket(packet);
+        const bool drained = buffered && receiver.drainPackets();
+        const auto end = Clock::now();
+        if (!drained) {
+            std::cerr << "Replay packet failed\n";
+            return;
+        }
+        benchmarkSink += receiver.expectedSequence();
+        const auto latency =std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        latencies.push_back(latency);
+        totalLatency+=latency;
+    }
+    printLatencyStats("reordered recovery client processing", latencies ,totalLatency);
+}
 
 int main(){
-
-    std::cout<<"-------addOnlyReplay Latency-------";
+    std::cout<<"-------addOnlyReplay Latency-------\n";
     calculateAddOnlyLatency();
-    std::cout<<"-------addOnlyReplay Latency------- \n\n";
 
-
-    std::cout<<"-------cancelOnlyReplay Latency-------";
+    std::cout<<"\n-------cancelOnlyReplay Latency-------\n";
     calculateCancelOnlyLatency();
-    std::cout<<"-------cancelOnlyReplay Latency------- \n\n";
 
-    std::cout<<"-------mixedReplay Latency-------";
+    std::cout<<"\n-------mixedReplay Latency-------\n";
     calculateMixedLatency();
-    std::cout<<"-------mixedReplay Latency------- \n\n";
 
+    std::cout<<"\n-------reorderedRecoveryReplay Latency-------\n";
+    calculateReorderedRecoveryLatency();
 
     return 0;
 }
