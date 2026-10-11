@@ -9,7 +9,7 @@ class MarketDataReceiver{
         std::vector<PendingPacketSlot> m_packetBuffer;
 
     public:
-        explicit MarketDataReceiver(MarketDataApplier& appiler);
+        explicit MarketDataReceiver(MarketDataApplier& applier);
         bool bufferPacket(const FeedPacket & packet);
         bool drainPackets();
         std::uint32_t expectedSequence() const;

@@ -67,7 +67,7 @@ int main(){
             continue;
         }
          if (!receiver.drainPackets()) {
-            std::cerr << "Could not apply recovered packet\n";
+            std::cerr << "Could not apply packet\n";
             close(socketFd);
             return 1;
         }
@@ -84,10 +84,18 @@ int main(){
             }
 
             for(const auto& packet:recoveredPackets){
-                receiver.bufferPacket(packet);
+                if(!receiver.bufferPacket(packet)){
+                    std::cerr<<"Invalid Recovered packet\n";
+                    close(socketFd);
+                    return 1;
+                }
             }
             std::cout<<"Recovered Packets start\n";
-            receiver.drainPackets();
+            if(!receiver.drainPackets()){
+                std::cerr<<"Could not apply recovered packets\n";
+                close(socketFd);
+                return 1;
+            }
             std::cout<<"Recovered Packets end:\n";
         }
         
